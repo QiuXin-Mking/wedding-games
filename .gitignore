@@ -1,0 +1,12 @@
+# 依赖
+node_modules/
+
+# 运行期产物：事件日志，只追加不改写，跨版本保留，绝不入库
+data/
+
+# 新人隐私题库：仅部署时单独投放到服务器，绝不提交
+questions/private.json
+
+# 系统杂项
+.DS_Store
+Thumbs.db
