@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
-const PAGES = ['index', 'screen', 'host', 'guide', 'how'];
+const PAGES = ['index', 'screen', 'host', 'guide', 'how', 'thanks', 'admin'];
 const read = (n) => readFileSync(new URL(`../public/${n}.html`, import.meta.url), 'utf8');
 
 describe('三端页面', () => {

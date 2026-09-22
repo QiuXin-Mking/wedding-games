@@ -457,3 +457,94 @@ describe('主持人端要能自己看到本题倒计时', () => {
     await app.close();
   });
 });
+
+describe('后台运维页', () => {
+  // 这个页面能一键清空全场成绩，所以口令必须独立于主持人，
+  // 且重置只归档不删除 —— 婚礼当天误点一次也不该丢掉已经打出来的成绩。
+  const mk = async (port) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const q = [];
+    ws.on('message', (r) => q.push(JSON.parse(r.toString())));
+    await new Promise((r) => ws.on('open', r));
+    const wait = (pred, ms = 3000) => new Promise((res, rej) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const hit = [...q].reverse().find(pred);
+        if (hit) { clearInterval(iv); res(hit); }
+        else if (Date.now() - t0 > ms) { clearInterval(iv); rej(new Error('等超时')); }
+      }, 20);
+    });
+    return { ws, q, wait, send: (o) => ws.send(JSON.stringify(o)) };
+  };
+
+  test('主持人口令进不了后台', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'admin1-'));
+    const app = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
+    const port = await app.listen(0);
+    const c = await mk(port);
+    c.send({ type: C2S.HELLO, role: ROLE.ADMIN, key: HOST_KEY });
+    const r = await c.wait((m) => m.type === S2C.REJECTED);
+    assert.equal(r.reason, REJECT.BAD_KEY, '后台口令必须独立于主持人');
+    c.ws.close(); await app.close();
+  });
+
+  test('重置清空对局，但把日志归档保留', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'admin2-'));
+    const app = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
+    const port = await app.listen(0);
+
+    // 先造出一局有数据的游戏
+    const g = await mk(port);
+    g.send({ type: C2S.HELLO, role: ROLE.GUEST });
+    await g.wait((m) => m.type === S2C.SNAPSHOT);
+    g.send({ type: C2S.JOIN, clientId: 'g1' });
+    await g.wait((m) => m.type === S2C.IDENTITY);
+
+    const a = await mk(port);
+    a.send({ type: C2S.HELLO, role: ROLE.ADMIN, key: 'adm' });
+    const before = await a.wait((m) => m.type === S2C.ADMIN_STATE);
+    assert.equal(before.joined, 1, '重置前应有 1 人入场');
+
+    const oldLogs = readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
+    assert.equal(oldLogs.length, 1);
+
+    a.q.length = 0;
+    a.send({ type: C2S.ADMIN_RESET });
+    const after = await a.wait((m) => m.type === S2C.ADMIN_STATE);
+    assert.equal(after.joined, 0, '重置后宾客清零');
+    assert.equal(after.stage, STAGE.IDLE, '重置后回到待机');
+
+    // 旧日志必须还在，只是挪进了 archive/
+    const archived = readdirSync(join(dir, 'archive'));
+    assert.ok(archived.includes(oldLogs[0]),
+      `旧日志必须归档保留而不是删除，archive/ 里有：${archived.join(', ')}`);
+
+    g.ws.close(); a.ws.close(); await app.close();
+  });
+
+  test('切换题库会被记住，重启后依然生效', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'admin3-'));
+    const app = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
+    const port = await app.listen(0);
+    const a = await mk(port);
+    a.send({ type: C2S.HELLO, role: ROLE.ADMIN, key: 'adm' });
+    const s0 = await a.wait((m) => m.type === S2C.ADMIN_STATE);
+    assert.equal(s0.bank, 'test');
+
+    a.q.length = 0;
+    a.send({ type: C2S.ADMIN_RESET, bank: 'wedding' });
+    const s1 = await a.wait((m) => m.type === S2C.ADMIN_STATE);
+    assert.equal(s1.bank, 'wedding', '应已切到正式题库');
+    a.ws.close(); await app.close();
+
+    // 重启：不带任何环境变量，也必须还是 wedding
+    const app2 = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
+    const port2 = await app2.listen(0);
+    const b = await mk(port2);
+    b.send({ type: C2S.HELLO, role: ROLE.ADMIN, key: 'adm' });
+    const s2 = await b.wait((m) => m.type === S2C.ADMIN_STATE);
+    assert.equal(s2.bank, 'wedding',
+      '题库选择没持久化 —— 服务一重启就会悄悄退回测试题库，而那一刻没人在看大屏角标');
+    b.ws.close(); await app2.close();
+  });
+});

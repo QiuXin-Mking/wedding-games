@@ -260,6 +260,7 @@ function render(){
     [st===STAGE.PAUSED?'继续':'暂停',st===STAGE.PAUSED?C2S.HOST_RESUME:C2S.HOST_PAUSE,!(asking||st===STAGE.PAUSED),0],
     ['重新公布结果',C2S.HOST_REPUBLISH,!reveal,0],
     ['把二维码打回大屏',C2S.HOST_SHOW_QR,false,0],
+    ['鸣谢打到大屏',C2S.HOST_CREDITS,st!==STAGE.FINAL,0],
     ['跳过本题（全员 0 分）',C2S.HOST_SKIP,!(asking||reveal||st===STAGE.PAUSED),1],
     ['换一道备用题',C2S.HOST_BACK,!reveal||!H.hasSpare,1],
   ].map(([t,a,dis,danger])=>'<button data-a="'+a+'"'+(danger?' data-confirm="1" class=danger':'')+

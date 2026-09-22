@@ -13,15 +13,22 @@
 
 import { Game } from './game.js';
 import { EventLog, replayInto } from './eventlog.js';
+import { loadBank, saveBankChoice } from './quizbank.js';
 import { now } from './clock.js';
+import { renameSync, mkdirSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { C2S, S2C, ROLE, STAGE, REJECT, NOTICE } from './protocol.js';
 
 export class Hub {
   /**
    * @param {{bank, nicknames, log: EventLog, resume?: Array<object>}} deps
    */
-  constructor({ bank, nicknames, log, resume }) {
+  constructor({ bank, nicknames, log, resume, dataDir }) {
     this.game = new Game({ bank, nicknames });
+    // 后台页要能就地换题库、重开一局，这几样是重建时用的
+    this.bank = bank;
+    this.nicknames = nicknames;
+    this.dataDir = dataDir ?? null;
     this.log = log;
     /** ws -> {role, clientId} */
     this.conns = new Map();
@@ -41,6 +48,68 @@ export class Hub {
     } else {
       this.log.append([{ type: 'boot', bank: bank.name, questionCount: bank.total }]);
     }
+  }
+
+  /**
+   * 清空全部状态，重开一局；给了 bankName 就顺便换题库。
+   *
+   * **只归档不删除**：当前日志改名挪进 data/archive/，和 tools/reset-game.sh 一个口径。
+   * 婚礼当天误点一次也不会丢掉已经打出来的成绩 —— 这是这个功能唯一重要的设计决定。
+   *
+   * 换题库会写 data/bank 持久化，否则服务一重启就退回环境变量指定的那个。
+   */
+  resetAll({ bankName } = {}) {
+    if (!this.dataDir) throw new Error('未提供 dataDir，无法重置');
+
+    this.log.close();
+    try {
+      const dir = join(this.dataDir, 'archive');
+      mkdirSync(dir, { recursive: true });
+      // 归档**所有**遗留日志，不只是当前这一份。
+      // 服务重启时若旧日志不可续用（比如题库对不上），会新建一份而把旧的留在原地；
+      // 按钮上写的是「清空全部状态」，只挪走当前那一份就名不副实了。
+      for (const f of readdirSync(this.dataDir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        renameSync(join(this.dataDir, f), join(dir, f));
+      }
+    } catch { /* 归档失败不该挡住重开，日志还在原处 */ }
+
+    if (bankName && bankName !== this.bank.name) {
+      this.bank = loadBank({ bank: bankName });   // 校验不过会抛，旧库继续用
+      saveBankChoice(this.dataDir, bankName);
+    }
+
+    this.log = EventLog.create(this.dataDir);
+    this.game = new Game({ bank: this.bank, nicknames: this.nicknames });
+    this.recovered = null;
+    this.recoveredNoticed = false;
+    this.creditsOn = false;
+    this.log.append([{ type: 'boot', bank: this.bank.name, questionCount: this.bank.total, reset: true }]);
+
+    // 三端一律无条件重建：大屏收起鸣谢，所有人回到待机页
+    this.broadcast({ type: S2C.CREDITS, on: false }, (m) => m.role === ROLE.SCREEN);
+    for (const [ws, meta] of this.conns) {
+      if (meta.role === ROLE.GUEST) meta.clientId = null;   // 旧身份已经不存在了
+      this.#raw(ws, JSON.stringify(this.snapshotFor(null, meta.role)));
+    }
+    return { bank: this.bank.name, label: this.bank.label };
+  }
+
+  /** 后台页要看的：当前题库 + 这一局已经累积了多少东西 */
+  adminState() {
+    const g = this.game;
+    let answers = 0;
+    for (const gu of g.guests.values()) answers += gu.answers.size;
+    return {
+      type: S2C.ADMIN_STATE,
+      bank: this.bank.name,
+      bankLabel: this.bank.label,
+      stage: g.stage,
+      qIndex: g.qIndex,
+      total: g.bank.total,
+      joined: g.joined,
+      answers,
+    };
   }
 
   // ── 连接管理（只用于知道往哪儿发，不参与任何判定）────────────
@@ -144,6 +213,13 @@ export class Hub {
 
   handleHostAction(ws, type, payload) {
     // 纯展示类动作，不碰游戏状态，也不写日志
+    // 鸣谢是个纯展示开关，不碰游戏状态、不写日志，随便点多少次都无害
+    if (type === C2S.HOST_CREDITS) {
+      this.creditsOn = !this.creditsOn;
+      this.broadcast({ type: S2C.CREDITS, on: this.creditsOn }, (m) => m.role === ROLE.SCREEN);
+      return { ok: true, events: [], creditsOn: this.creditsOn };
+    }
+
     if (type === C2S.HOST_SHOW_QR) {
       this.broadcast({ type: S2C.SHOW_QR, on: true }, (m) => m.role === ROLE.SCREEN);
       return { ok: true, events: [] };

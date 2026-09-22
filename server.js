@@ -11,7 +11,7 @@ import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 
-import { loadBank } from './src/quizbank.js';
+import { loadBank, resolveBankName } from './src/quizbank.js';
 import { loadDefaultPool } from './src/nicknames.js';
 import { EventLog } from './src/eventlog.js';
 import { Hub } from './src/hub.js';
@@ -33,6 +33,10 @@ const ROUTES = {
   '/guide': 'guide.html',
   // 给非技术人员看的流程说明。可以直接转发给新人、长辈、婚礼策划。
   '/how': 'how.html',
+  // 后台运维页。口令独立 —— 这页能一键清空全场成绩
+  // 鸣谢页：可转发的网页版，大屏那份在 screen.html 里
+  '/thanks': 'thanks.html',
+  '/admin': 'admin.html',
 };
 
 const MIME = {
@@ -112,9 +116,11 @@ function serveStatic(req, res) {
 export function createApp(opts = {}) {
   const screenKey = opts.screenKey ?? process.env.SCREEN_KEY ?? 'screen';
   const hostKey = opts.hostKey ?? process.env.HOST_KEY ?? 'host';
+  const adminKey = opts.adminKey ?? process.env.ADMIN_KEY ?? 'admin';
   const dataDir = opts.dataDir ?? DATA_DIR;
 
-  const bank = loadBank();
+  // 题库以 data/bank 为准（后台页切过就记在那儿），没有才看环境变量
+  const bank = loadBank({ bank: resolveBankName(dataDir) });
   const nicknames = loadDefaultPool();
 
   // 只续用「还热着」的日志；几天前的彩排绝不会被当成本场继续
@@ -140,7 +146,7 @@ export function createApp(opts = {}) {
   }
   if (!log) log = EventLog.create(dataDir);
 
-  const hub = new Hub({ bank, nicknames, log, resume });
+  const hub = new Hub({ bank, nicknames, log, resume, dataDir });
   hub.resumeNote = resumeNote;
   // 每次启动都留一条痕迹，事后能看出重启过几次、几点重启（否则无从审计）
   if (resume) log.append([{ type: 'boot', bank: bank.name, questionCount: bank.total, resumed: resume.length }]);
@@ -159,7 +165,7 @@ export function createApp(opts = {}) {
       } catch {
         return; // 垃圾数据直接丢，不回应、不断开
       }
-      handleMessage(hub, ws, msg, { screenKey, hostKey });
+      handleMessage(hub, ws, msg, { screenKey, hostKey, adminKey });
     });
     ws.on('close', () => hub.detach(ws));
     ws.on('error', () => hub.detach(ws));
@@ -202,11 +208,15 @@ function handleMessage(hub, ws, msg, keys) {
     if (role === ROLE.HOST && msg.key !== keys.hostKey) {
       return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
     }
-    if (![ROLE.GUEST, ROLE.SCREEN, ROLE.HOST].includes(role)) {
+    if (role === ROLE.ADMIN && msg.key !== keys.adminKey) {
+      return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
+    }
+    if (![ROLE.GUEST, ROLE.SCREEN, ROLE.HOST, ROLE.ADMIN].includes(role)) {
       return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
     }
     hub.attach(ws, role, msg.clientId ?? null);
     // 连接与每次重连后的第一条永远是 snapshot，前端据此无条件重建
+    if (role === ROLE.ADMIN) return hub.send(ws, hub.adminState());
     return hub.send(ws, hub.snapshotFor(msg.clientId ?? null, role));
   }
 
@@ -229,6 +239,19 @@ function handleMessage(hub, ws, msg, keys) {
   if (msg.type === C2S.ANSWER) {
     if (meta.role !== ROLE.GUEST || !meta.clientId) return;
     return void hub.handleAnswer(ws, meta.clientId, msg.qIndex, msg.optionIndex);
+  }
+
+  if (msg.type === C2S.ADMIN_RESET) {
+    if (meta.role !== ROLE.ADMIN) {
+      return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
+    }
+    try {
+      hub.resetAll({ bankName: msg.bank });
+    } catch (e) {
+      // 换库失败（文件缺失、格式错）时旧库仍在跑，把原因原样告诉后台人员
+      return hub.send(ws, { ...hub.adminState(), error: e.message });
+    }
+    return hub.send(ws, hub.adminState());
   }
 
   if (typeof msg.type === 'string' && msg.type.startsWith('host:')) {

@@ -13,6 +13,8 @@ export const ROLE = Object.freeze({
   GUEST: 'guest',
   SCREEN: 'screen',
   HOST: 'host',
+  /** 后台运维页。口令独立于主持人 —— 它能一键清空全场成绩 */
+  ADMIN: 'admin',
 });
 
 /** 客户端 → 服务端 */
@@ -42,6 +44,11 @@ export const C2S = Object.freeze({
       随机昵称切断了名字与真人的联系，光靠主持人念、宾客举手认领并不可靠 ——
       嘈杂环境里听错、或者不敢举手怕认错，都会让发奖环节冷场。 */
   HOST_CALL: 'host:call',
+  /** 颁奖结束后，把鸣谢打到大屏上：活动策划与技术支持的微信码 */
+  HOST_CREDITS: 'host:credits',
+
+  /** 后台：清空全部状态重新开始，可同时切换题库。带 bank 就换库，不带就只重来 */
+  ADMIN_RESET: 'admin:reset',
 });
 
 /**
@@ -87,6 +94,10 @@ export const S2C = Object.freeze({
   SHOW_QR: 'qr',
   /** 发奖点名：只发给被叫到的那一位 */
   CALLED: 'called',
+  /** 大屏切换鸣谢画面。on=false 收起 */
+  CREDITS: 'credits',
+  /** 后台页要看到的东西：当前题库、阶段、这一局已经累积了多少数据 */
+  ADMIN_STATE: 'adminState',
   REJECTED: 'rejected',
   PONG: 'pong',
 });

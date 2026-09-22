@@ -69,6 +69,45 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 #qrmini.on{display:block}
 #qrmini img{width:11vh;height:11vh;background:#fff;padding:.4vh;box-shadow:0 0 0 1px var(--line)}
 /* 主持人一键召回的大二维码。游戏开始后待机页就没了，迟到的人本来无处可扫 */
+/* 鸣谢：颁奖结束后由主持人打到大屏。二维码要大到坐最后一桌也扫得到 */
+#credits{position:fixed;inset:0;display:none;z-index:9;background:var(--paper);overflow:hidden}
+#credits.on{display:grid;place-content:center;justify-items:center}
+#credits .glow{position:absolute;inset:-20vmax;pointer-events:none}
+#credits .glow i{position:absolute;display:block;border-radius:50%;filter:blur(70px);opacity:.55}
+#credits .g1{width:50vmax;height:50vmax;left:6%;top:0;background:radial-gradient(circle,rgba(200,54,47,.2),transparent 68%)}
+#credits .g2{width:44vmax;height:44vmax;right:4%;bottom:2%;background:radial-gradient(circle,rgba(201,162,39,.24),transparent 68%)}
+#credits .inner{position:relative;display:grid;justify-items:center;gap:1.4vh}
+#credits .seal{display:grid;place-content:center;width:7vh;height:7vh;background:var(--seal);color:#fff;
+  border-radius:1.2vh;font:600 3.4vh/1 "Songti SC",serif}
+#credits h2{font:600 6.4vh/1.2 "Songti SC","Noto Serif CJK SC",serif;margin:1.4vh 0 0;letter-spacing:.34em;text-indent:.34em;color:var(--ink)}
+#credits .ln{width:11vh;height:.35vh;background:var(--gold);border-radius:1px;margin:.6vh 0 1.2vh}
+#credits .lede{font-size:2.3vh;color:var(--ink2)}
+#credits .two{display:grid;grid-template-columns:1fr 1fr;gap:6vh;margin-top:3.4vh}
+#credits .one{display:grid;justify-items:center;gap:1vh}
+#credits .role{font:500 1.7vh/1 system-ui;color:var(--gold2,#A88520);letter-spacing:.24em;
+  border:1px solid rgba(201,162,39,.45);border-radius:99px;padding:.8vh 1.6vh}
+#credits .who{font:600 3.6vh/1.2 "Songti SC","Noto Serif CJK SC",serif;color:var(--ink)}
+#credits .box{position:relative;padding:1vh;background:#fff;border-radius:1.2vh;box-shadow:0 .4vh 2vh rgba(61,43,35,.12)}
+#credits .box::after{content:"";position:absolute;inset:-.9vh;border:.28vh solid var(--seal);border-radius:1.8vh;opacity:.55}
+#credits img{display:block;width:30vh;height:auto;border-radius:.6vh}
+#credits .tail{margin-top:3vh;text-align:center;color:var(--ink2);font-size:2.1vh;line-height:2}
+#credits .date{font:600 2.6vh/1.6 "Songti SC",serif;color:var(--ink);letter-spacing:.2em;margin-top:1vh}
+@media (prefers-reduced-motion:no-preference){
+  #credits.on .g1{animation:cdrift 24s ease-in-out infinite}
+  #credits.on .g2{animation:cdrift2 30s ease-in-out infinite}
+  #credits.on .seal{animation:cstamp .75s cubic-bezier(.2,1.5,.4,1) both}
+  #credits.on h2{animation:cup .8s .2s cubic-bezier(.23,1,.32,1) both}
+  #credits.on .lede{animation:cup .8s .5s cubic-bezier(.23,1,.32,1) both}
+  #credits.on .one:nth-child(1){animation:cup .9s .72s cubic-bezier(.23,1,.32,1) both}
+  #credits.on .one:nth-child(2){animation:cup .9s .9s cubic-bezier(.23,1,.32,1) both}
+  #credits.on .tail{animation:cup .9s 1.15s cubic-bezier(.23,1,.32,1) both}
+  #credits.on .box::after{animation:cbreathe 3.6s ease-in-out infinite}
+}
+@keyframes cdrift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5vmax,4vmax) scale(1.12)}}
+@keyframes cdrift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vmax,-4vmax) scale(1.14)}}
+@keyframes cstamp{from{transform:scale(2.4) rotate(-14deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+@keyframes cup{from{transform:translateY(2.6vh);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes cbreathe{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.03);opacity:.9}}
 #qrbig{position:fixed;inset:0;display:none;place-content:center;justify-items:center;gap:2vh;background:rgba(247,241,232,.97);z-index:8;font-size:2vw;color:var(--ink2)}
 #qrbig.on{display:grid}
 #qrbig img{width:46vh;height:46vh;background:#fff;padding:1.2vh;box-shadow:0 0 0 1px var(--line)}
@@ -78,6 +117,28 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 <div id=conn></div>
 <div id=stage></div>
 <div id=qrmini><img src=/qr.png alt="" onerror=qrFail(this,1)><div>没进来的扫这里</div></div>
+<div id=credits>
+  <div class=glow><i class=g1></i><i class=g2></i></div>
+  <div class=inner>
+    <div class=seal>谢</div>
+    <h2>鸣谢</h2>
+    <div class=ln></div>
+    <div class=lede>今天这个答题环节，是这两个人一起折腾出来的</div>
+    <div class=two>
+      <div class=one>
+        <span class=role>活 动 策 划</span>
+        <div class=who>草莓柚</div>
+        <div class=box><img src=/wx-planner.jpg alt="活动策划微信" onerror="qrFail(this,1)"></div>
+      </div>
+      <div class=one>
+        <span class=role>技 术 支 持</span>
+        <div class=who>邱　鑫</div>
+        <div class=box><img src=/wx-tech.jpg alt="技术支持微信" onerror="qrFail(this,1)"></div>
+      </div>
+    </div>
+    <div class=tail>进不去、卡住了，或者只是想说句话，扫码都能找到我们<div class=date>2026 · 10 · 06</div></div>
+  </div>
+</div>
 <div id=qrbig><img src=/qr.png alt="扫码进入" onerror=qrFail(this)><div>没进来的现在扫</div></div>
 <script type=module>
 import {C2S,S2C,STAGE,ROLE} from '/src/protocol.js';
@@ -165,6 +226,7 @@ function handle(m){
     case S2C.PAUSED:S.paused=true;return render();
     case S2C.RESUMED:S.paused=false;deadline=Date.now()+offset+(m.remainMs||0);return render();
     case S2C.NOTICE:return;
+    case S2C.CREDITS:return $('#credits').classList.toggle('on',m.on!==false);
     case S2C.SHOW_QR:return bigQr();
   }
 }

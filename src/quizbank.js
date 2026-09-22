@@ -8,7 +8,8 @@
  * 婚礼当天用错题库是不可接受的事故，这是唯一的防呆。
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { RULES } from './protocol.js';
 
 export const BANK_TEST = 'test';
@@ -116,6 +117,34 @@ export function validateBank(raw) {
  * @param {{bank?: string, dir?: URL|string}} [opts]
  * @returns {QuizBank}
  */
+/**
+ * 当前该用哪个题库。
+ *
+ * **优先读 data/bank 文件，其次才是环境变量。**
+ * 后台页切换题库时写这个文件 —— 不持久化的话，当天切到正式题库之后
+ * 只要服务重启一次（崩溃自愈、机器重启）就会悄悄退回环境变量指定的测试题库，
+ * 而大屏角标那一刻没人在看。
+ *
+ * @param {string} [dataDir]
+ */
+export function resolveBankName(dataDir) {
+  if (dataDir) {
+    try {
+      const f = join(dataDir, 'bank');
+      const saved = existsSync(f) ? readFileSync(f, 'utf8').trim() : '';
+      if (VALID_BANKS.includes(saved)) return saved;
+    } catch { /* 读不到就按环境变量来 */ }
+  }
+  return process.env.QUIZ_BANK ?? BANK_TEST;
+}
+
+/** 记住后台页选的题库，重启后仍然生效 */
+export function saveBankChoice(dataDir, name) {
+  if (!VALID_BANKS.includes(name)) throw new Error(`题库名非法：${name}`);
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(join(dataDir, 'bank'), name);
+}
+
 export function loadBank(opts = {}) {
   const bank = opts.bank ?? process.env.QUIZ_BANK ?? BANK_TEST;
   if (!VALID_BANKS.includes(bank)) {

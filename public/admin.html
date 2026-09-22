@@ -1,0 +1,173 @@
+<!doctype html><html lang=zh-CN><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>后台 · 婚礼答题</title>
+<style>
+:root{--paper:#F7F1E8;--card:#FCF8F2;--ink:#2A1C16;--ink2:#5C483C;--ink3:#8C7A6B;
+      --seal:#C8362F;--gold:#9A7B16;--ok:#2E7D53;--line:rgba(42,28,22,.14)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* hidden 只是 [hidden]{display:none}，会被 .keybox{display:grid} 这类规则盖掉 */
+[hidden]{display:none!important}
+body{margin:0;min-height:100dvh;background:var(--paper);color:var(--ink);
+     font:16px/1.6 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+     -webkit-font-smoothing:antialiased}
+.wrap{max-width:560px;margin:0 auto;padding:26px 18px calc(env(safe-area-inset-bottom) + 40px)}
+
+h1{font:600 20px/1.4 system-ui;margin:0 0 2px}
+.sub{color:var(--ink3);font-size:13px;margin-bottom:20px}
+#link{float:right;font-size:13px;font-weight:600}
+#link.ok{color:var(--ok)}#link.bad{color:var(--seal)}
+
+/* ── 当前状态：按钮之前必须先看清自己要毁掉什么 ── */
+.now{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px}
+.now h2{font:500 11px/1 system-ui;color:var(--ink3);letter-spacing:.16em;margin:0 0 12px}
+.kv{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-top:1px solid var(--line)}
+.kv:first-of-type{border-top:0}
+.kv span{color:var(--ink2);font-size:14px}
+.kv b{font:600 16px/1.3 system-ui;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:3px 9px;border:1px solid var(--line);border-radius:5px;font-size:13px;font-weight:500}
+.tag.live{border-color:var(--seal);color:var(--seal)}
+.danger-hint{margin-top:12px;padding:10px 12px;border-radius:9px;background:rgba(200,54,47,.07);
+             color:var(--seal);font-size:13.5px;font-weight:600;line-height:1.6;display:none}
+.danger-hint.on{display:block}
+
+/* ── 两个按钮 ── */
+.acts{display:grid;gap:12px;margin-top:22px}
+button{width:100%;min-height:56px;border-radius:11px;font:600 16px/1.35 inherit;cursor:pointer;
+       border:1px solid var(--line);background:var(--card);color:var(--ink);
+       transition:transform .12s cubic-bezier(.23,1,.32,1),opacity .16s}
+button:active{transform:scale(.985)}
+button:disabled{opacity:.4;cursor:default}
+button small{display:block;font:400 12.5px/1.5 inherit;color:var(--ink3);margin-top:3px}
+button.danger{border-color:rgba(200,54,47,.55);color:var(--seal)}
+button.danger small{color:rgba(200,54,47,.75)}
+
+#msg{margin-top:16px;padding:11px 13px;border-radius:9px;font-size:14px;line-height:1.6;display:none}
+#msg.on{display:block}
+#msg.ok{background:rgba(46,125,83,.09);color:var(--ok)}
+#msg.err{background:rgba(200,54,47,.09);color:var(--seal)}
+
+.keybox{display:grid;gap:12px;margin-top:20px}
+.keybox input{width:100%;min-height:50px;padding:0 14px;border:1px solid var(--line);border-radius:10px;
+              background:#fff;color:inherit;font:500 17px/1 inherit;text-align:center;letter-spacing:.1em}
+.keybox input:focus{outline:none;border-color:var(--seal)}
+.err{color:var(--seal);font-size:13.5px;font-weight:600;text-align:center;min-height:18px}
+.foot{margin-top:26px;color:var(--ink3);font-size:12.5px;line-height:1.8}
+.foot code{background:rgba(42,28,22,.05);padding:1px 5px;border-radius:4px}
+</style>
+
+<div class=wrap>
+  <span id=link>连接中…</span>
+  <h1>后台</h1>
+  <div class=sub>婚礼答题 · 运维控制</div>
+
+  <div id=body hidden>
+    <div class=now>
+      <h2>当 前 状 态</h2>
+      <div class=kv><span>题库</span><b id=bank class=tag>—</b></div>
+      <div class=kv><span>阶段</span><b id=stage>—</b></div>
+      <div class=kv><span>已入场</span><b><span id=joined>0</span> 人</b></div>
+      <div class=kv><span>已产生作答</span><b><span id=answers>0</span> 条</b></div>
+      <div class=danger-hint id=warn></div>
+    </div>
+
+    <div class=acts>
+      <button id=swap>切换题库<small id=swapHint>—</small></button>
+      <button id=reset class=danger>清空并重新开始<small>宾客清零、题号归零、分数清空。日志归档保留，不会真的删掉</small></button>
+    </div>
+
+    <div id=msg></div>
+
+    <div class=foot>
+      两个操作都会<b>立刻重开一局</b>，三端自动回到待机页，不需要手动刷新。<br>
+      事件日志只归档不删除，落在服务器的 <code>data/archive/</code> 里。<br>
+      切换题库会被记住，服务重启后依然生效。
+    </div>
+  </div>
+
+  <div class=keybox id=gate hidden>
+    <div class=err id=gateErr></div>
+    <input id=key type=password placeholder="后台口令" autocomplete=off>
+    <button id=go>进　入</button>
+  </div>
+</div>
+
+<script type=module>
+import {C2S,S2C,ROLE,STAGE} from '/src/protocol.js';
+const $=s=>document.querySelector(s);
+let key=new URLSearchParams(location.search).get('key')||localStorage.getItem('wq_admin_key')||'';
+let A=null;
+
+const STAGE_CN={IDLE:'待机',READY:'已开始，等出题',ASKING:'答题中',PAUSED:'暂停中',REVEAL:'结算中',FINAL:'已公布最终排名'};
+
+function setLink(cls,txt){const el=$('#link');el.className=cls;el.textContent=txt}
+function say(kind,txt){const el=$('#msg');el.className=kind+' on';el.textContent=txt}
+
+function render(){
+  if(!A)return;
+  $('#gate').hidden=true;$('#body').hidden=false;
+  const live=A.bank==='wedding';
+  $('#bank').textContent=A.bankLabel||A.bank;
+  $('#bank').className='tag'+(live?' live':'');
+  $('#stage').textContent=(STAGE_CN[A.stage]||A.stage)+(A.qIndex>=0?(' · 第 '+(A.qIndex+1)+' / '+A.total+' 题'):'');
+  $('#joined').textContent=A.joined;
+  $('#answers').textContent=A.answers;
+  $('#swapHint').textContent=live?'当前是正式题库，点击切回测试题库':'当前是测试题库，点击切到正式题库';
+  // 有数据就把后果摆出来 —— 按钮之前要先看清自己要毁掉什么
+  const has=A.joined>0||A.answers>0;
+  const w=$('#warn');
+  w.className='danger-hint'+(has?' on':'');
+  w.textContent=has?('这一局已经有 '+A.joined+' 人入场、'+A.answers+' 条作答记录。两个按钮都会把它们清空。'):'';
+}
+
+let ws=null,back=800,timer=0;
+function send(o){if(ws?.readyState===1){ws.send(JSON.stringify(o));return true}say('err','没连上，这一下没生效');return false}
+function connect(){
+  clearTimeout(timer);
+  ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
+  ws.onopen=()=>{back=800;setLink('ok','已连接');ws.send(JSON.stringify({type:C2S.HELLO,role:ROLE.ADMIN,key}))};
+  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}handle(m)};
+  ws.onclose=()=>{setLink('bad','连接中断，重连中…');timer=setTimeout(connect,back);back=Math.min(back*2,8000)};
+  ws.onerror=()=>{try{ws.close()}catch{}};
+}
+
+function handle(m){
+  if(m.type===S2C.REJECTED){setLink('bad','需要口令');return gate(key?'口令不对，再试一次':'')}
+  if(m.type===S2C.ADMIN_STATE){
+    A=m;render();
+    if(m.error)say('err','没能切过去：'+m.error+'（旧题库仍在使用）');
+    return;
+  }
+}
+
+function gate(err){
+  $('#body').hidden=true;$('#gate').hidden=false;
+  $('#gateErr').textContent=err||'';
+  const inp=$('#key');inp.value='';inp.focus();
+}
+$('#go').onclick=()=>{
+  const v=$('#key').value.trim();if(!v)return;
+  key=v;try{localStorage.setItem('wq_admin_key',v)}catch{}
+  ws?.send(JSON.stringify({type:C2S.HELLO,role:ROLE.ADMIN,key}));
+};
+$('#key').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
+
+$('#swap').onclick=()=>{
+  if(!A)return;
+  const to=A.bank==='wedding'?'test':'wedding';
+  const toName=to==='wedding'?'正式题库':'测试题库';
+  if(!confirm('切换到'+toName+'？\n\n这会同时清空当前这一局（'+A.joined+' 人 / '+A.answers+' 条作答），重新开始。'))return;
+  if(send({type:C2S.ADMIN_RESET,bank:to}))say('ok','正在切换到'+toName+'…');
+};
+
+$('#reset').onclick=()=>{
+  if(!A)return;
+  const has=A.joined>0||A.answers>0;
+  const extra=has?('\n\n当前有 '+A.joined+' 人入场、'+A.answers+' 条作答记录，全部清零。'):'';
+  if(!confirm('清空并重新开始？'+extra+'\n\n日志会归档保留，不会真的删掉。'))return;
+  if(send({type:C2S.ADMIN_RESET}))say('ok','正在重开一局…');
+};
+
+if(!key)gate('');
+connect();
+</script>
+</html>

@@ -1,0 +1,137 @@
+<!doctype html><html lang=zh-CN><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>鸣谢 · 婚礼答题</title>
+<style>
+:root{--paper:#F7F1E8;--card:#FCF8F2;--ink:#3D2B23;--ink2:#6B5344;--ink3:#9A8877;
+      --seal:#C8362F;--gold:#C9A227;--gold2:#A88520;--line:rgba(61,43,35,.10);--line2:rgba(61,43,35,.18)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--paper);color:var(--ink);overflow-x:hidden;
+     font:16px/1.8 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+     -webkit-font-smoothing:antialiased;text-wrap:pretty}
+
+/* ── 背景：三团缓慢漂移的暖光。只动 transform，不重排不重绘 ── */
+.glow{position:fixed;inset:-30vmax;z-index:0;pointer-events:none;overflow:hidden}
+.glow i{position:absolute;display:block;border-radius:50%;filter:blur(60px);opacity:.5}
+.g1{width:52vmax;height:52vmax;left:4%;top:2%;
+    background:radial-gradient(circle,rgba(200,54,47,.22),transparent 68%)}
+.g2{width:46vmax;height:46vmax;right:2%;top:26%;
+    background:radial-gradient(circle,rgba(201,162,39,.24),transparent 68%)}
+.g3{width:58vmax;height:58vmax;left:22%;bottom:-6%;
+    background:radial-gradient(circle,rgba(200,54,47,.13),transparent 70%)}
+
+.wrap{position:relative;z-index:1;max-width:680px;margin:0 auto;
+      padding:0 22px calc(env(safe-area-inset-bottom) + 64px)}
+
+/* ── 头 ── */
+header{padding:74px 0 10px;text-align:center}
+.seal{display:inline-grid;place-content:center;width:62px;height:62px;
+      background:var(--seal);color:#fff;border-radius:11px;
+      font:600 25px/1 "Songti SC","Noto Serif CJK SC",serif;letter-spacing:.06em;
+      box-shadow:0 5px 18px rgba(200,54,47,.3)}
+h1{font:600 clamp(30px,8vw,40px)/1.3 "Songti SC","Noto Serif CJK SC",serif;
+   margin:26px 0 0;letter-spacing:.3em;text-indent:.3em}
+.rule{width:0;height:2px;background:var(--gold);margin:20px auto 0;border-radius:2px}
+.lede{color:var(--ink2);font-size:16.5px;margin:20px auto 0;max-width:26em}
+
+/* ── 两张名片 ── */
+.cards{display:grid;gap:18px;margin:44px 0 0}
+@media(min-width:600px){.cards{grid-template-columns:1fr 1fr;gap:20px}}
+.card{background:var(--card);border:1px solid var(--line2);border-radius:16px;
+      padding:26px 20px 22px;text-align:center;
+      box-shadow:0 2px 14px rgba(61,43,35,.05)}
+.role{display:inline-block;font:500 11.5px/1 system-ui;color:var(--gold2);
+      letter-spacing:.2em;padding:6px 12px;border:1px solid rgba(201,162,39,.4);border-radius:999px}
+.who{font:600 24px/1.3 "Songti SC","Noto Serif CJK SC",serif;margin:16px 0 6px}
+.did{color:var(--ink2);font-size:14.5px;line-height:1.85;min-height:3.7em}
+
+/* 二维码：朱砂描边缓缓呼吸 */
+.qr{position:relative;width:168px;margin:18px auto 0}
+.qr::after{content:"";position:absolute;inset:-7px;border:1.5px solid var(--seal);
+           border-radius:14px;opacity:.5}
+.qr img{display:block;width:100%;border-radius:8px;background:#fff}
+.scan{margin-top:16px;color:var(--ink3);font-size:13px;letter-spacing:.04em}
+
+/* ── 底 ── */
+.foot{margin-top:52px;text-align:center}
+.foot p{color:var(--ink2);font-size:15px;margin:0 0 6px}
+.date{font:600 19px/1.6 "Songti SC","Noto Serif CJK SC",serif;color:var(--ink);
+      letter-spacing:.14em;margin-top:22px}
+.tail{margin-top:10px;color:var(--ink3);font-size:13px}
+.back{display:inline-block;margin-top:30px;color:var(--gold2);font-size:14px;
+      text-decoration:none;border-bottom:1px solid rgba(201,162,39,.45);padding-bottom:2px}
+
+/* ── 动效 ────────────────────────────────────────────────
+   一律写在 no-preference 里：默认状态就是最终状态。
+   动画跑不起来（减弱动态、老浏览器、后台标签页）时，页面照样是完整的。 */
+@media (prefers-reduced-motion:no-preference){
+  .g1{animation:drift1 26s ease-in-out infinite}
+  .g2{animation:drift2 32s ease-in-out infinite}
+  .g3{animation:drift3 38s ease-in-out infinite}
+  .seal{animation:stamp .7s cubic-bezier(.2,1.5,.4,1) both}
+  h1{animation:up .8s .18s cubic-bezier(.23,1,.32,1) both}
+  .rule{animation:draw .7s .5s cubic-bezier(.23,1,.32,1) both}
+  .lede{animation:up .8s .62s cubic-bezier(.23,1,.32,1) both}
+  .card:nth-of-type(1){animation:up .85s .8s cubic-bezier(.23,1,.32,1) both}
+  .card:nth-of-type(2){animation:up .85s .96s cubic-bezier(.23,1,.32,1) both}
+  .qr::after{animation:breathe 3.4s ease-in-out infinite}
+  .foot{animation:up .9s 1.2s cubic-bezier(.23,1,.32,1) both}
+}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}
+                  50%{transform:translate(5vmax,4vmax) scale(1.13)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}
+                  50%{transform:translate(-6vmax,5vmax) scale(1.1)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}
+                  50%{transform:translate(4vmax,-4vmax) scale(1.16)}}
+@keyframes stamp{from{transform:scale(2.4) rotate(-14deg);opacity:0}
+                 to{transform:scale(1) rotate(0);opacity:1}}
+@keyframes up{from{transform:translateY(22px);opacity:0}
+              to{transform:translateY(0);opacity:1}}
+@keyframes draw{from{width:0}to{width:82px}}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.5}
+                   50%{transform:scale(1.035);opacity:.85}}
+/* 没有动画时也要有这条金线 */
+@media (prefers-reduced-motion:reduce){.rule{width:82px}}
+</style>
+
+<div class=glow><i class=g1></i><i class=g2></i><i class=g3></i></div>
+
+<div class=wrap>
+
+<header>
+  <div class=seal>谢</div>
+  <h1>鸣谢</h1>
+  <div class=rule></div>
+  <p class=lede>今天这个答题环节，是这两个人凑在一起折腾出来的。</p>
+</header>
+
+<div class=cards>
+
+  <div class=card>
+    <span class=role>活 动 策 划</span>
+    <div class=who>草莓柚</div>
+    <p class=did>想出了这个点子，定下玩法，把一场婚礼的热闹提前想了无数遍。</p>
+    <div class=qr><img src="/wx-planner.jpg" alt="活动策划的微信二维码" loading=lazy></div>
+    <div class=scan>微信扫一扫</div>
+  </div>
+
+  <div class=card>
+    <span class=role>技 术 支 持</span>
+    <div class=who>邱&nbsp;鑫</div>
+    <p class=did>写了这套系统，今天也在现场。有任何地方卡住了，随时找他。</p>
+    <div class=qr><img src="/wx-tech.jpg" alt="技术支持的微信二维码" loading=lazy></div>
+    <div class=scan>微信扫一扫</div>
+  </div>
+
+</div>
+
+<div class=foot>
+  <p>进不去、卡住了，或者只是想说句话 ——</p>
+  <p>扫上面的码都能找到我们。</p>
+  <div class=date>2026 · 10 · 06</div>
+  <div class=tail>愿今天的热闹，你也在其中。</div>
+  <a class=back href="/how">看看这个游戏是怎么玩的 →</a>
+</div>
+
+</div>
+</html>

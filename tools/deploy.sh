@@ -49,7 +49,7 @@ case "${1:-deploy}" in
     # 刷新预压缩产物。峰值时 CPU 要留给 WebSocket，不能运行时压缩
     node -e '
       const {readFileSync,writeFileSync}=require("fs"),{gzipSync}=require("zlib");
-      for(const f of ["public/index.html","public/screen.html","public/host.html","public/guide.html","public/how.html","src/protocol.js"])
+      for(const f of ["public/index.html","public/screen.html","public/host.html","public/guide.html","public/how.html","public/thanks.html","public/admin.html","src/protocol.js"])
         writeFileSync(f+".gz",gzipSync(readFileSync(f),{level:9}));
     '
     echo "  预压缩已刷新"
