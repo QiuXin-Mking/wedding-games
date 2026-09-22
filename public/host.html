@@ -21,6 +21,11 @@ html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);
 #bar .tag.live{border-color:var(--seal);color:var(--seal)}
 #link{margin-left:auto;font-weight:600}
 #link.ok{color:var(--ok)}#link.me{color:var(--seal)}#link.srv{color:var(--seal)}
+/* 本题倒计时。整场累计耗时(#clock)是给我自己看的，这个是要喊出口的 ——
+   「还有十秒」是主持人最常说的一句，不该逼他扭头看大屏跟全场抢视线。 */
+#qtick{font:700 20px/1 system-ui;font-variant-numeric:tabular-nums;color:var(--seal);min-width:1.6em}
+#qtick:empty{display:none}
+#qtick.last{font-size:23px}
 #clock{font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:600}
 #clock.over{color:var(--seal)}
 #pace{color:var(--ink3)}
@@ -84,6 +89,7 @@ details[open] summary::after{content:'▴'}
 <div id=app>
   <div id=bar>
     <span class=tag id=bank>—</span>
+    <span id=qtick class=num></span>
     <span id=clock class=num>0:00</span><span id=pace></span>
     <span id=link>连接中…</span>
   </div>
@@ -167,6 +173,11 @@ function askKey(err){
   box.append(h,er,inp,btn,tip);host.append(box);keyBox=box;inp.focus();
 }
 
+/* 主持人端没做对时，所以服务端给的是剩余毫秒，这里换算成本地截止时刻后自行递减。
+   误差只有一个网络延迟（实测 ~12ms），喊读秒完全够用。 */
+let qEnd=0;
+function noteRemain(ms){ qEnd = (typeof ms === "number") ? Date.now()+ms : 0; }
+
 function handle(m){
   if(m.type===S2C.REJECTED){
     if(m.reason===REJECT.BAD_KEY){setLink('srv','需要口令');return askKey(key?'口令不对，再试一次':'')}
@@ -174,8 +185,8 @@ function handle(m){
   }
   if(m.type===S2C.CSV)return download(m.filename,m.content);
   if(m.type===S2C.GUEST_LIST){guests=m.guests||[];return renderGuests()}
-  if(m.type===S2C.SNAPSHOT&&m.host)Object.assign(H,m.host);
-  if(m.type===S2C.HOST_STATE)Object.assign(H,m);
+  if(m.type===S2C.SNAPSHOT&&m.host){Object.assign(H,m.host);noteRemain(m.host.remainMs)}
+  if(m.type===S2C.HOST_STATE){Object.assign(H,m);noteRemain(m.remainMs)}
   if(m.type===S2C.SNAPSHOT||m.type===S2C.HOST_STATE){
     if(!startedAt&&H.qIndex>=0)startedAt=Date.now();
     render();
@@ -191,6 +202,13 @@ function download(name,text){
 
 /* ── 时间预算：主持人全程不知道自己有没有超时 ── */
 setInterval(()=>{
+  // 本题倒计时：主持人要照着它喊「还有十秒」
+  const qt=$('#qtick');
+  if(qt){
+    const left=qEnd?Math.max(0,Math.ceil((qEnd-Date.now())/1000)):0;
+    qt.textContent=(H.stage===STAGE.ASKING&&qEnd)?left+'s':'';
+    qt.className='num'+(left<=5&&left>0?' last':'');
+  }
   const el=$('#clock');if(!el)return;
   if(!startedAt){el.textContent='0:00';return}
   const s=Math.floor((Date.now()-startedAt)/1000);
@@ -285,7 +303,14 @@ document.addEventListener('click',e=>{
   if(b){
     if(b.disabled)return;
     const a=b.dataset.a;if(!a)return;
-    if(b.dataset.confirm&&!confirm(b.textContent+'？这一步不可撤销。'))return;
+    if(b.dataset.confirm){
+      // 结算后作废和答题中作废后果完全不同：前者答案已经公布、分已经进了宾客口袋，
+      // 作废是当众把分收回去。通用的「不可撤销」四个字说不出这件事。
+      const msg=(b.dataset.a===C2S.HOST_SKIP&&H.stage===STAGE.REVEAL)
+        ?'这题的答案已经公布了。' + '\n\n' + '作废会把大家刚拿到的分收回去，大屏上的排名会当众变动。确定？'
+        :b.textContent+'？这一步不可撤销。';
+      if(!confirm(msg))return;
+    }
     // 「公布最终排名」和「下一题」共用底部同一个位置，而主持人此时已经在那里
     // 连点了 12 次。点下去就进 FINAL：救场按钮全禁用、新宾客一律被拒，
     // 且进程内没有任何路径能回到 REVEAL。AC-58 要求 finish 必须二次确认。

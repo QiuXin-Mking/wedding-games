@@ -388,7 +388,11 @@ describe('主持人唱分数据（D14 / AC-38）', () => {
     g.tick(T0 + RULES.QUESTION_MS);
     const s = g.hostStatePayload();
     assert.equal(s.joined, 4);
-    assert.equal(s.answered, 4, '结算后未提交者也记为已处理');
+    // 原断言是 4，理由写的是「结算后未提交者也记为已处理」—— 那是把 bug 写成了规范。
+    // 这个字段会被主持人直接念出口（「这题 N 位来宾作答」），语义只能是**真的答了的人数**。
+    // 第 4 位没提交，就不能算进去。演练中主持人发现「选项分布加起来永远对不上已作答人数」，
+    // 根因正是这里虚高；而这条测试当时站在 bug 那一边，所以一直没被抓出来。
+    assert.equal(s.answered, 3, '4 人在场、3 人提交，唱分只能说 3');
     assert.equal(s.correctCount, 2);
     assert.equal(s.correctIndex, CORRECT);
     assert.equal(s.leader.nickname, '昵称0');
@@ -476,5 +480,38 @@ describe('非法状态迁移被拒', () => {
       gg.hostAction(C2S.HOST_NEXT, { expectedQIndex: i }, T0 + (i + 1) * 100_000 + 1);
     }
     assert.equal(gg.stage, STAGE.FINAL);
+  });
+});
+
+describe('唱分的数字必须说真话', () => {
+  // 主持人会把「已作答 N 人」直接念出口。#settle 给未作答者补 {optionIndex:-1}
+  // 记录，若 answeredCount 只看 answers.has()，结算后所有人都算已作答 ——
+  // 主持人就会在台上念「这题 3 位作答」而实际只有 1 位点了。
+  // 演练中正是主持人发现「选项分布加起来永远对不上已作答人数」暴露了这个 bug。
+  test('结算后，未作答者不得被算进已作答人数', () => {
+    const { g, ids } = started(3);
+    g.answer(ids[0], 0, CORRECT, T0 + 2000);   // 只有一个人真的点了
+
+    assert.equal(g.answeredCount(), 1, '结算前：1 人作答');
+    g.hostAction(C2S.HOST_EARLY_SETTLE, { expectedQIndex: 0 }, T0 + 3000);
+    assert.equal(g.answeredCount(), 1, '结算后仍然只有 1 人作答，不能因为补了超时记录就变成 3');
+
+    // 与分布对齐 —— 这两个数字是同一件事的两种说法，必须相等
+    const sum = g.distribution().reduce((a, b) => a + b, 0);
+    assert.equal(sum, g.answeredCount(), '选项分布之和必须等于已作答人数');
+  });
+
+  test('全员真作答时，两个数字都等于人数', () => {
+    const { g, ids } = started(3);
+    ids.forEach((id, i) => g.answer(id, 0, i === 0 ? CORRECT : WRONG, T0 + 1000 + i * 100));
+    assert.equal(g.answeredCount(), 3);
+    assert.equal(g.distribution().reduce((a, b) => a + b, 0), 3);
+  });
+
+  test('一个人都没答时，结算后是 0 而不是全员', () => {
+    const { g } = started(3);
+    g.hostAction(C2S.HOST_EARLY_SETTLE, { expectedQIndex: 0 }, T0 + 3000);
+    assert.equal(g.answeredCount(), 0, '没人点，就得是 0');
+    assert.equal(g.distribution().reduce((a, b) => a + b, 0), 0);
   });
 });

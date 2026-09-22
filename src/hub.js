@@ -275,6 +275,24 @@ export class Hub {
     this.dirty.host = true;
   }
 
+  /**
+   * 主持人状态 + 本题剩余时间。
+   *
+   * 主持人端没做对时（只有宾客端和大屏做了），所以给绝对截止时刻没用，
+   * 直接给剩余毫秒、由前端本地递减，误差只有一个网络延迟（实测 ~12ms）。
+   *
+   * 为什么非加不可：控制台上那个 MM:SS 是**整场累计耗时**，不是本题倒计时。
+   * 演练中主持人说，想知道还剩几秒只能扭头看大屏 —— 那等于当众跟全场抢视线，
+   * 而「还有十秒」是他最常喊的一句话。
+   */
+  #hostState() {
+    const p = this.game.hostStatePayload();
+    p.remainMs = this.game.stage === STAGE.ASKING
+      ? Math.max(0, Math.round(this.game.deadlineAt - now()))
+      : null;
+    return p;
+  }
+
   /** 立即刷出被标脏的推送。tick 每 200ms 调一次 */
   flushDirty() {
     if (this.dirty.progress) {
@@ -288,7 +306,7 @@ export class Hub {
     }
     if (this.dirty.host) {
       this.dirty.host = false;
-      this.broadcast(this.game.hostStatePayload(), (m) => m.role === ROLE.HOST);
+      this.broadcast(this.#hostState(), (m) => m.role === ROLE.HOST);
     }
   }
 
@@ -323,7 +341,7 @@ export class Hub {
       recovered: this.recovered?.interrupted ?? false,
     };
 
-    if (role === ROLE.HOST) return { ...base, host: g.hostStatePayload() };
+    if (role === ROLE.HOST) return { ...base, host: this.#hostState() };
 
     if (g.stage === STAGE.ASKING || g.stage === STAGE.PAUSED) {
       base.question = g.questionPayloadFor(clientId);

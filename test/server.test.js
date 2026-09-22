@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import WebSocket from 'ws';
 
 import { createApp } from '../server.js';
-import { C2S, S2C, ROLE, REJECT, STAGE } from '../src/protocol.js';
+import { C2S, S2C, ROLE, REJECT, STAGE, RULES } from '../src/protocol.js';
 
 const SCREEN_KEY = 'scr-key';
 const HOST_KEY = 'host-key';
@@ -412,5 +412,48 @@ describe('入场失败必须有回执', () => {
     c.send({ type: C2S.JOIN, clientId: 'x' });
     assert.equal((await c.next(S2C.REJECTED)).reason, REJECT.BAD_JOIN);
     c.close();
+  });
+});
+
+describe('主持人端要能自己看到本题倒计时', () => {
+  // 控制台上的 MM:SS 是整场累计耗时，不是本题倒计时。演练中主持人说，
+  // 想知道还剩几秒只能扭头看大屏 —— 那等于当众跟全场抢视线，
+  // 而「还有十秒」恰恰是他最常喊的一句。
+  test('hostState 在答题中带 remainMs，其他阶段为 null', async () => {
+    // 用独立实例，不蹭共享 app —— 它的 stage 取决于前面跑了哪些用例
+    const dir = mkdtempSync(join(tmpdir(), 'qtick-'));
+    const app = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, tickMs: 30 });
+    const port = await app.listen(0);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const q = [];
+    ws.on('message', (r) => q.push(JSON.parse(r.toString())));
+    await new Promise((r) => ws.on('open', r));
+    const wait = (pred, ms = 3000) => new Promise((res, rej) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const hit = [...q].reverse().find(pred);
+        if (hit) { clearInterval(iv); res(hit); }
+        else if (Date.now() - t0 > ms) { clearInterval(iv); rej(new Error('等超时')); }
+      }, 20);
+    });
+
+    ws.send(JSON.stringify({ type: C2S.HELLO, role: ROLE.HOST, key: HOST_KEY }));
+    const snap = await wait((m) => m.type === S2C.SNAPSHOT);
+    assert.equal(snap.host.remainMs, null, 'IDLE 态不该有本题剩余时间');
+
+    ws.send(JSON.stringify({ type: C2S.HOST_START, expectedQIndex: -1 }));
+    await wait((m) => m.type === S2C.HOST_STATE && m.stage === STAGE.READY);
+    ws.send(JSON.stringify({ type: C2S.HOST_NEXT, expectedQIndex: -1 }));
+
+    const asking = await wait((m) => m.type === S2C.HOST_STATE && m.stage === STAGE.ASKING);
+    assert.equal(typeof asking.remainMs, 'number', '答题中必须给出剩余毫秒');
+    assert.ok(asking.remainMs > 0 && asking.remainMs <= RULES.QUESTION_MS,
+      `剩余时间要落在 0~${RULES.QUESTION_MS} 之间，实际 ${asking.remainMs}`);
+
+    ws.send(JSON.stringify({ type: C2S.HOST_EARLY_SETTLE, expectedQIndex: 0 }));
+    const reveal = await wait((m) => m.type === S2C.HOST_STATE && m.stage === STAGE.REVEAL);
+    assert.equal(reveal.remainMs, null, '结算后不该再显示倒计时');
+    ws.close();
+    await app.close();
   });
 });

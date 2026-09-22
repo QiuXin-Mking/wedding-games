@@ -90,11 +90,26 @@ export class Game {
     return this.overrides.get(this.qIndex) ?? this.bank.question(this.qIndex);
   }
 
-  /** 本题已作答人数 */
+  /**
+   * 本题**真正提交过答案**的人数。
+   *
+   * 必须按 optionIndex 判定，不能只看有没有记录：#settle 会给每位未作答的宾客
+   * 补一条 {optionIndex:-1, outcome:TIMEOUT}，若只用 answers.has()，结算之后
+   * 所有人都会被算成「已作答」。
+   *
+   * 这个数字是主持人唱分时要念出口的（「这题 86 位来宾作答」），
+   * 虚高就等于让他在台上念错数。演练中主持人正是因此发现
+   * 「选项分布加起来永远对不上已作答人数」—— 不是分布丢票，是这里虚高。
+   *
+   * ASKING 态行为不变：那时还没有 -1 记录，两种口径等价，
+   * 所以「全员答完自动结算」的判定不受影响。
+   */
   answeredCount() {
     if (this.qIndex < 0) return 0;
     let n = 0;
-    for (const g of this.guests.values()) if (g.answers.has(this.qIndex)) n++;
+    for (const g of this.guests.values()) {
+      if ((g.answers.get(this.qIndex)?.optionIndex ?? -1) >= 0) n++;
+    }
     return n;
   }
 
@@ -351,10 +366,19 @@ export class Game {
     if (this.stage !== STAGE.ASKING && this.stage !== STAGE.PAUSED && this.stage !== STAGE.REVEAL) {
       return no(REJECT.ILLEGAL_TRANSITION);
     }
+    // 结算后作废和答题中作废，对宾客是两件事：前者他已经看到「答对了 +200」，
+    // 分是从手里被拿走的。不说清楚，他只会觉得「我的分怎么没了」——
+    // 演练中的宾客正是如此，还以为历史总分被吞了。
+    const wasRevealed = this.stage === STAGE.REVEAL;
     this.#voidCurrent();
     this.stage = STAGE.REVEAL;
     return ok([{ type: EV.QUESTION_SKIP, qIndex: this.qIndex }], {
-      notice: { kind: NOTICE.SKIPPED, text: '这题作废了，所有人都不计分，不是你的问题' },
+      notice: {
+        kind: NOTICE.SKIPPED,
+        text: wasRevealed
+          ? '这题作废了，刚才那一题的分退回去，所有人都不计分，不是你的问题'
+          : '这题作废了，所有人都不计分，不是你的问题',
+      },
       voided: true,
     });
   }
