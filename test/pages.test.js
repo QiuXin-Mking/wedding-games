@@ -71,3 +71,26 @@ describe('口令不对时不能是死胡同', () => {
     assert.match(src, /inp\.type\s*=\s*['"]password['"]/, '大屏口令明文显示会被全场看到甚至拍照');
   });
 });
+
+describe('结算页要把宾客最想知道的三件事说清楚', () => {
+  const src = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+
+  test('显示正确答案 —— 抬头看大屏是会错过的', () => {
+    // 13 道题全是关于新郎新娘的，宾客最想知道的恰恰是答案。
+    // 演练里三位宾客都提到：只能抬头瞄大屏，那一刻正在碰杯就永远不知道了。
+    assert.match(src, /correctIndex/, '结算页没有用到正确答案');
+    assert.match(src, /正确答案/, '结算页没有显示正确答案');
+  });
+
+  test('显示第几题 —— 错过的人要能定位自己', () => {
+    assert.match(src, /第 '\+\(qi\+1\)\+' \/ '\+S\.total\+' 题/,
+      '结算页不显示题号，错过的人失去时间坐标');
+  });
+
+  test('最后一题不得再说「下一题马上来」', () => {
+    assert.match(src, /const last=S\.total>0&&qi\+1>=S\.total/, '没有判断最后一题');
+    assert.match(src, /全部答完了/, '最后一题缺少收尾文案');
+    assert.equal(/下一题马上来/.test(src), false,
+      '「马上来」会让全场以为还有题，而主持人此刻正在唱分讲话');
+  });
+});

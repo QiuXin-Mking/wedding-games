@@ -1,9 +1,7 @@
 <!doctype html><html lang=zh-CN><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>婚礼答题</title><div id=boot style="position:fixed;inset:0;display:grid;place-content:center;justify-items:center;gap:20px;background:#F7F1E8;color:#6B5344;font:19px/1.5 'Songti SC',serif;text-align:center">正在进入…<div style="width:168px;height:3px;background:rgba(61,43,35,.1);border-radius:2px;overflow:hidden"><i id=bar style="display:block;height:100%;background:#C8362F;transform:scaleX(.04);transform-origin:left;transition:transform .35s cubic-bezier(.23,1,.32,1)"></i></div></div><script>
-/* 进度由文件里每隔约 20% 的 p(n) 调用推进 —— 浏览器解析到哪就报到哪，
-   是真实进度，不是定时器假动画。假进度条卡在 90% 比白屏更折磨人。 */
+/*→D1*/
 p=function(n){var b=document.getElementById('bar');if(b)b.style.transform='scaleX('+n/100+')'}
-/* 连不上时不能永远停在「正在进入」+ 进度条走满 —— 那正是「假进度卡住」的观感。
-   12 秒还没进入游戏就说人话，并给一个重试的出口。 */
+/*→D2*/
 setTimeout(function(){
   var b=document.getElementById('boot');
   if(b)b.innerHTML='<div style="font:19px/1.6 \'Songti SC\',serif">网络有点慢，还没连上</div>'+
@@ -11,48 +9,41 @@ setTimeout(function(){
     '<button onclick="location.reload()" style="min-height:48px;padding:0 28px;border:0;border-radius:10px;background:#C8362F;color:#fff;font:600 16px/1 inherit">重　试</button>';
 },12000);
 </script><style>
-/* boot 之外的一切都在这之后 —— 上面那段必须先于它到达，
-   浏览器边收边渲染，400 人集中扫码时每人只分到约 900 B/s。 */
+/*→D3*/
 :root{--paper:#F7F1E8;--ink:#3D2B23;--ink2:#6B5344;--ink3:#9A8877;--seal:#C8362F;--gold:#C9A227;--line:rgba(61,43,35,.10);--line2:rgba(61,43,35,.18)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased;text-wrap:pretty}
-/* ── 版式 ─────────────────────────────── */
+/* 版式 */
 .serif{font-family:"Songti SC","Noto Serif CJK SC",serif}
 .num{font-variant-numeric:tabular-nums}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
-/* ── 骨架：顶条 / 主体 / 底条 ───────────── */
+/* 骨架：顶条 主体 底条 */
 #app{display:none;min-height:100dvh;flex-direction:column}
 #app.on{display:flex}
 #top{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:2}
 #me{flex:1;min-width:0;font:600 17px/1.3 "Songti SC","Noto Serif CJK SC",serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* 倒计时压在题干正上方、居中放大 —— 演练里宾客说右上角那个小数字「根本不看」，
-   而这是全场唯一的紧迫感来源。tabular-nums 保证位数变化时不左右跳。 */
-/* 尺寸是层级问题，不是大小问题：题干（22px）必须是主角，倒计时是给节奏的配角。
-   取题干的约 1.7 倍（430px 屏约 36px）—— 一眼看得见，但明确是配角。
-   64px 试过，数字抢走全部注意力，正是演练里「要看的题被挤下去」那个状态；
-   28px 也试过，和题干平级，紧迫感等于没有。四档实机比选后定 36px。 */
+/*→D4*/
+/*→D5 改的是比例，不是数字*/
 #tick{font:700 clamp(30px,8.4vw,40px)/1 system-ui;color:var(--seal);text-align:center;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 #tick.idle{font:500 13px/1 system-ui;color:var(--ink3)}
 #tick:empty{display:none}
-/* 最后 5 秒心跳。只动 transform，数字本身任何时刻都是实的 ——
-   动画没跑起来（后台标签页、降级浏览器）也照样看得见，见 AC-61。 */
+/*→D6*/
 @keyframes beat{0%{transform:scale(1)}12%{transform:scale(1.14)}45%{transform:scale(1)}}
 #tick.urge{animation:beat 1s linear infinite}
 @media (prefers-reduced-motion:reduce){#tick.urge{animation:none}}
 #prog{height:2px;background:var(--line)}
 #prog i{display:block;height:100%;background:var(--seal);transform-origin:left}
-/* 倒计时与题目同属一个居中块 —— 钉在 main 外面的话，手机上两者会被
-   撑开近 200px 的空白，压迫感全散掉。 */
+/*→D7*/
 main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-content:center;gap:6px}
 #view{display:flex;flex-direction:column;gap:18px}
 #hint{padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);border-top:1px solid var(--line);color:var(--ink2);font-size:14px;text-align:center;background:var(--paper)}
 
-/* ── 题干：手机端的主视觉 ──────────────── */
+/* 题干：手机端的主视觉 */
 .qno{color:var(--ink3);font-size:13px;letter-spacing:.06em}
 .qtext{font:600 22px/1.45 "Songti SC","Noto Serif CJK SC",serif;text-wrap:balance;margin:2px 0 4px}
 
-/* ── 选项：像喜帖上的条目，不是一排按钮 ── */
+/* 选项：像喜帖上的条目，不是一排按钮 */
 .opts{display:grid;gap:10px}
 .opt{position:relative;display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 64px 12px 14px;border:1px solid var(--line2);border-radius:10px;background:transparent;color:inherit;font:400 17px/1.4 inherit;text-align:left;cursor:pointer;transition:border-color .16s,background-color .16s,transform .12s cubic-bezier(.23,1,.32,1)}
 .opt:active{transform:scale(.985)}
@@ -67,30 +58,24 @@ main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-con
 .seal{position:absolute;right:12px;top:50%;width:46px;height:46px;border:2px solid var(--seal);border-radius:7px;color:var(--seal);display:grid;place-content:center;font:600 19px/1 "Songti SC","Noto Serif CJK SC",serif;transform:translateY(-50%) rotate(-16deg) scale(1.9);opacity:0;transition:transform .34s cubic-bezier(.23,1,.32,1),opacity .18s;pointer-events:none}
 .opt[aria-pressed=true] .seal{transform:translateY(-50%) rotate(-7deg) scale(1);opacity:1}
 
-/* ── 入场 / 揭晓 ───────────────────────────────────────────
-   用 CSS 入场动画，不靠 JS 加 class 点亮。
-   后台标签页的 requestAnimationFrame 会被浏览器暂停 —— 宾客锁屏或切到微信时
-   正好揭晓的话，靠 JS 点亮的元素就永远停在不可见状态。
-   animation + fill-mode:both 即使被节流，恢复可见时也会落到终态。 */
+/*→D8 可见性不得依赖动画*/
 .mid{display:grid;justify-items:center;gap:16px;text-align:center}
 .rule{width:132px;height:1px;background:var(--gold);transform-origin:center;animation:draw .55s forwards cubic-bezier(.23,1,.32,1)}
 @keyframes draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .name{font:600 30px/1.3 "Songti SC","Noto Serif CJK SC",serif;animation:rise .5s forwards cubic-bezier(.23,1,.32,1)}
-/* 只动 transform，不动 opacity。
-   标签页隐藏时浏览器会把动画冻在 0% 帧，任何 fill-mode 都救不回来 ——
-   所以内容的可见性绝不能取决于动画是否跑起来。装饰可以动，正文不能。
-   最坏情况下昵称只是小 6%，照样读得清。 */
+/*→D8*/
 @keyframes rise{from{transform:scale(.94)}to{transform:scale(1)}}
 .sub{color:var(--ink2);font-size:15px}
 .btn{min-height:52px;padding:0 34px;border:0;border-radius:10px;background:var(--seal);color:#fff;font:600 17px/1 inherit;cursor:pointer;transition:transform .12s cubic-bezier(.23,1,.32,1),opacity .16s}
 .btn:active{transform:scale(.97)}
 .btn:disabled{opacity:.5}
 
-/* ── 结算 ─────────────────────────────── */
+/* 结算 */
 .verdict{font:600 26px/1.3 "Songti SC","Noto Serif CJK SC",serif}
 .verdict.ok{color:var(--seal)}
 .verdict.no{color:var(--ink2)}
 .gain{font:600 40px/1 system-ui;font-variant-numeric:tabular-nums}
+.ans{color:#A88520;font:600 16px/1.5 "Songti SC",serif}
 .stats{display:flex;gap:22px;justify-content:center;color:var(--ink2);font-size:14px}
 .stats b{display:block;font:600 19px/1.3 system-ui;color:var(--ink);font-variant-numeric:tabular-nums}
 #notice{margin:0 16px;padding:10px 14px;border-left:3px solid var(--gold);background:rgba(201,162,39,.10);color:var(--ink2);font-size:14.5px;border-radius:0 8px 8px 0}
@@ -99,11 +84,7 @@ main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-con
 .top10 div.mine{background:rgba(200,54,47,.08);font-weight:600}
 .top10 s{flex:none;width:1.6em;color:var(--ink3);text-decoration:none;font-variant-numeric:tabular-nums}
 .top10 u{flex:1;min-width:0;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* ── 发奖点名：被叫到的人全屏亮起 ────────────────────────
-   随机昵称切断了名字与真人的联系。演练里三个角色都撞上同一件事：
-   主持人念名字没人应、宾客把「开心的柯基」听成「幸运的锦鲤」、
-   长辈「不敢举手，怕举错了丢人」。这一层就是让当事人确信「叫的是我」。
-   注意不以 opacity:0 起步 —— 内容的可见性不能取决于动画跑起来。 */
+/*→D10*/
 #called{position:fixed;inset:0;z-index:9;display:none;place-content:center;justify-items:center;gap:18px;padding:24px;background:var(--seal);color:#fff;text-align:center}
 #called.on{display:grid}
 #called b{font:600 34px/1.3 "Songti SC","Noto Serif CJK SC",serif}
@@ -123,8 +104,7 @@ main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-con
 import {C2S,S2C,STAGE,OUTCOME} from '/src/protocol.js';
 p(85);
 
-/* localStorage 在 iOS 无痕下会抛异常。全部包起来并退化为内存态 —— 宁可刷新丢身份，
-   也不能白屏。 */
+/*→D11*/
 const mem={};
 const ls={
   get(k){try{return localStorage.getItem(k)}catch{return mem[k]??null}},
@@ -137,10 +117,10 @@ const $=s=>document.querySelector(s);
 const view=$('#view'),hint=$('#hint'),tick=$('#tick'),meEl=$('#me'),notice=$('#notice');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-const S={stage:null,me:null,q:null,my:null,reveal:null,final:null,joined:0,answered:0,sent:null,pending:null};
+const S={stage:null,me:null,q:null,my:null,reveal:null,final:null,joined:0,answered:0,sent:null,pending:null,total:0};
 let offset=0,deadline=0,raf=0;
 
-/* ── 对时：5 次探针取 rtt 最小的样本 ───────────────────────── */
+/* 对时：5 次探针取 rtt 最小的样本 */
 const probes=[];
 function sync(){for(let i=0;i<5;i++)setTimeout(()=>send({type:C2S.SYNC,t0:Date.now()}),i*120)}
 function onPong(m){
@@ -150,7 +130,7 @@ function onPong(m){
   offset=probes[0].off;   // 最小 rtt 的样本受排队延迟污染最少
 }
 
-/* ── 倒计时：本地推进，不逐秒依赖网络 ──────────────────────── */
+/* 倒计时：本地推进，不逐秒依赖网络 */
 function runTick(){
   cancelAnimationFrame(raf);
   const bar=$('#prog i');
@@ -168,9 +148,9 @@ function runTick(){
   step();
 }
 function stopTick(txt){cancelAnimationFrame(raf);tick.className='idle';tick.textContent=txt||'';$('#prog i').style.transform='scaleX(0)'}
-/* className='idle' 会一并抹掉 urge，不需要单独清 —— 但别把它改成 classList.add */
+/*→D13 别改成 classList.add*/
 
-/* ── 连接：指数退避，但回到前台立即重连 ─────────────────────── */
+/* 连接：指数退避，但回到前台立即重连 */
 let ws=null,back=800,timer=0;
 function send(m){if(ws?.readyState===1)ws.send(JSON.stringify(m))}
 function connect(){
@@ -186,7 +166,7 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&ws?.readyState!==1){back=800;connect()}
 });
 
-/* ── 消息 ──────────────────────────────────────────────── */
+/* 消息 */
 function handle(m){
   switch(m.type){
     case S2C.PONG:return onPong(m);
@@ -203,12 +183,13 @@ function handle(m){
       // 宾客以为还在提交就不再点，最后 0 分。
       S.pending=null;
       if(S.q){deadline=S.q.deadlineAt;S.sent=S.q.mySubmitted?S.q.myOption:null}
+      S.total=m.total||S.total;
       S.paused=(m.stage==='PAUSED');
       return render();
     }
     case S2C.IDENTITY:releaseJoin();S.me={clientId:m.clientId,nickname:m.nickname,total:0,correctCount:0};S.stage='REVEALING';return render();
     case S2C.QUESTION:
-      S.q=m;S.my=null;S.reveal=null;S.stage=STAGE.ASKING;
+      S.q=m;S.my=null;S.reveal=null;S.stage=STAGE.ASKING;S.total=m.total||S.total;
       // extend 会重播 question。载荷带着 mySubmitted/myOption，
       // 所以整体重渲染不会冲掉已提交态。
       S.sent=m.mySubmitted?m.myOption:null;S.pending=null;
@@ -250,8 +231,7 @@ function showCalled(name){
 let noticeT=0;
 function flash(t){notice.textContent=t;notice.hidden=false;clearTimeout(noticeT);noticeT=setTimeout(()=>{notice.hidden=true},7000)}
 
-/* 「进入」按钮的救生索。点下即变灰等 identity，而失败路径不止一条（被拒、
-   消息丢了、服务端没回），任何一条都会让按钮永远灰着。不猜原因，8 秒兜底。 */
+/*→D12*/
 let joinT=0;
 function armJoinTimeout(){
   clearTimeout(joinT);
@@ -265,7 +245,7 @@ function releaseJoin(why){
   if(why)flash(why);
 }
 
-/* ── 渲染：收到消息整体重画，不做增量对账 ───────────────────── */
+/* 渲染：收到消息整体重画，不做增量对账 */
 function render(){
   document.getElementById('boot')?.remove();
   $('#app').classList.add('on');
@@ -355,14 +335,23 @@ function paintResult(){
   const word=voided?'本题作废'
     :my?.outcome==null?'这题不计分'
     :ok?'答对了':my.outcome===OUTCOME.TIMEOUT?'没赶上':'答错了';
+  /*→D14 结算页要回答的三件事*/
+  const qi=rv?.qIndex??S.q?.qIndex??-1;
+  const last=S.total>0&&qi+1>=S.total;
+  const ci=rv?.correctIndex??-1;
+  const ans=(!voided&&ci>=0)?('正确答案　'+'ABCD'[ci]+(S.q?.options?.[ci]?'　'+esc(S.q.options[ci]):'')):'';
   view.innerHTML='<div class="mid">'+
+    (qi>=0&&S.total?'<div class=qno>第 '+(qi+1)+' / '+S.total+' 题</div>':'')+
     '<div class="verdict '+(ok?'ok':'no')+'">'+word+'</div>'+
     (voided?'':'<div class="gain num">'+(my?.gained>0?'+'+my.gained:'0')+'</div>')+
+    (ans?'<div class=ans>'+ans+'</div>':'')+
     '<div class=rule></div>'+
     '<div class=stats><div>总分<b class=num>'+(my?.total??0)+'</b></div>'+
     (my?.rank?'<div>名次<b class=num>'+my.rank+' / '+my.of+'</b></div>':'')+'</div></div>';
   stopTick('已结算');
-  hint.textContent=voided?'这题所有人都不计分，不是你的问题':'看大屏，下一题马上来';
+  hint.textContent=voided?'这题所有人都不计分，不是你的问题'
+    :last?'全部答完了，看大屏公布最终排名'
+    :'看大屏 · 等主持人出下一题';
 }
 
 function paintFinal(){
