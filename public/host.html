@@ -1,3 +1,261 @@
-<!doctype html><meta charset="utf-8">
-<title>占位 · host</title>
-<p>占位页面，第 5 步替换为真正的 host 端。</p>
+<!doctype html><html lang=zh-CN><meta charset=utf-8><title>主持人控制台</title>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+/* 使用场景决定一切：站在台上、左手拿话筒、只能单手、灯打在脸上、
+   低头看屏幕的每一秒台下都在等。所以：
+   - 对比拉满（强光下要看得清），不用淡灰色
+   - 主操作只有一个，独占底部拇指区
+   - 救场操作收进抽屉，和主操作物理隔离 —— 防的是误触，不是手滑 */
+:root{--paper:#F7F1E8;--ink:#2A1C16;--ink2:#5C483C;--ink3:#8C7A6B;
+  --seal:#C8362F;--gold:#9A7B16;--line:rgba(42,28,22,.14);--ok:#2E7D53}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);
+  font:16px/1.5 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+.serif{font-family:"Songti SC","Noto Serif CJK SC",serif}
+.num{font-variant-numeric:tabular-nums}
+#app{min-height:100dvh;display:flex;flex-direction:column}
+
+/* ── 状态条 ────────────────────────── */
+#bar{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 14px 8px;border-bottom:1px solid var(--line);font-size:13px;position:sticky;top:0;background:var(--paper);z-index:3}
+#bar .tag{padding:3px 8px;border:1px solid var(--line);border-radius:5px;color:var(--ink2);font-weight:500}
+#bar .tag.live{border-color:var(--seal);color:var(--seal)}
+#link{margin-left:auto;font-weight:600}
+#link.ok{color:var(--ok)}#link.me{color:var(--seal)}#link.srv{color:var(--seal)}
+#clock{font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:600}
+#clock.over{color:var(--seal)}
+
+main{flex:1;padding:14px;display:flex;flex-direction:column;gap:14px}
+
+/* ── 题干与答案：主持人要照着念，字必须大 ── */
+.card{border:1px solid var(--line);border-radius:12px;padding:14px}
+.qno{font-size:13px;color:var(--ink3);letter-spacing:.06em}
+.qtext{font:600 21px/1.4 "Songti SC","Noto Serif CJK SC",serif;margin:4px 0 12px;text-wrap:balance}
+.opt{display:flex;gap:10px;align-items:center;padding:7px 0;font-size:17px;border-top:1px solid var(--line)}
+.opt:first-of-type{border-top:0}
+.opt .k{flex:none;width:24px;height:24px;border:1px solid var(--line);border-radius:50%;display:grid;place-content:center;font:600 12px/1 system-ui;color:var(--ink2)}
+.opt.right{font-weight:600}
+.opt.right .k{border-color:var(--gold);background:var(--gold);color:#fff}
+.opt.right::after{content:'正确答案';margin-left:auto;font-size:12px;font-weight:600;color:var(--gold)}
+
+/* ── 唱分四项：结算时主持人念的就是这几个数 ── */
+.say{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.say div{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.say b{display:block;font:600 26px/1.15 system-ui;font-variant-numeric:tabular-nums}
+.say span{font-size:12px;color:var(--ink3)}
+.say .lead b{font:600 19px/1.3 "Songti SC","Noto Serif CJK SC",serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 主操作：独占底部拇指区 ─────────── */
+#foot{position:sticky;bottom:0;padding:10px 14px calc(env(safe-area-inset-bottom) + 12px);border-top:1px solid var(--line);background:var(--paper);display:grid;gap:8px}
+.primary{min-height:62px;border:0;border-radius:12px;background:var(--seal);color:#fff;font:600 20px/1 inherit;cursor:pointer;transition:transform .12s cubic-bezier(.23,1,.32,1),opacity .16s}
+.primary:active{transform:scale(.98)}
+.primary:disabled{opacity:.35}
+.primary.calm{background:var(--ink)}
+
+/* ── 救场抽屉：和主操作物理隔离 ────── */
+details{border:1px solid var(--line);border-radius:10px}
+summary{padding:11px 14px;cursor:pointer;font-size:15px;color:var(--ink2);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'▾';float:right;color:var(--ink3)}
+details[open] summary::after{content:'▴'}
+.rescue{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}
+.rescue button{min-height:48px;border:1px solid var(--line);border-radius:9px;background:none;color:var(--ink);font:500 15px/1.2 inherit;cursor:pointer;transition:transform .12s cubic-bezier(.23,1,.32,1)}
+.rescue button:active{transform:scale(.97)}
+.rescue button:disabled{opacity:.3}
+.rescue button.danger{border-color:rgba(200,54,47,.5);color:var(--seal)}
+.rescue .wide{grid-column:1/-1}
+
+/* ── 宾客管理 ─────────────────────── */
+#find{width:100%;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:rgba(42,28,22,.035);color:inherit;font:15px inherit}
+.who{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
+.who u{flex:1;text-decoration:none;font-family:"Songti SC",serif;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who button{min-height:36px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:none;color:var(--ink2);font:13px inherit;cursor:pointer}
+.who button.danger{border-color:rgba(200,54,47,.45);color:var(--seal)}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 92px);transform:translateX(-50%) translateY(8px);opacity:0;padding:10px 16px;border-radius:9px;background:var(--ink);color:var(--paper);font-size:14.5px;transition:opacity .18s,transform .22s cubic-bezier(.23,1,.32,1);pointer-events:none;z-index:9;max-width:88vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+<div id=app>
+  <div id=bar>
+    <span class=tag id=bank>—</span>
+    <span id=clock class=num>0:00</span>
+    <span id=link>连接中…</span>
+  </div>
+  <main>
+    <div class=card id=qcard><div class=qno>尚未开始</div></div>
+    <div class=say id=say></div>
+    <details id=drawer><summary>救场操作</summary><div class=rescue id=rescue></div></details>
+    <details><summary>宾客管理 / 导出</summary><div class=rescue style="grid-template-columns:1fr">
+      <input id=find placeholder="按昵称搜索宾客" autocomplete=off>
+      <div id=list></div>
+      <button class=wide id=csv>导出明细 CSV</button>
+    </div></details>
+  </main>
+  <div id=foot><button class=primary id=go disabled>连接中…</button></div>
+</div>
+<div id=toast></div>
+<script type=module>
+import {C2S,S2C,STAGE} from '/src/protocol.js';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const key=new URLSearchParams(location.search).get('key')||'';
+
+let H={stage:null,qIndex:-1,total:0,joined:0,answered:0,correctCount:0,text:null,options:[],correctIndex:-1,leader:null,hasSpare:true,voided:false,bank:'—'};
+let startedAt=0,guests=[];
+
+/* ── 提示条：每次点击都必须有明确回执 ──────────────────────
+   台上最怕的是「点了没反应，不知道是没生效还是界面慢」，于是本能地再点一次。 */
+let toastT=0;
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2200)}
+
+/* ── 连接状态：必须区分「我掉线」和「服务器挂了」 ─────────
+   这两种情况的处置完全相反 —— 一个是换备用设备，一个是当众宣布降级。
+   断开后探一下 HTTP：能通说明服务器活着，是我这条连接的问题。 */
+function setLink(cls,txt){const el=$('#link');el.className=cls;el.textContent=txt}
+async function diagnose(){
+  try{
+    const c=new AbortController();setTimeout(()=>c.abort(),3000);
+    await fetch('/?probe='+Date.now(),{signal:c.signal,cache:'no-store'});
+    setLink('me','本机掉线 · 服务器正常');
+  }catch{setLink('srv','服务器不可达');}
+}
+
+let ws=null,back=800,timer=0;
+function send(m){
+  if(ws?.readyState!==1){toast('没连上，这一下没生效');return false}
+  ws.send(JSON.stringify(m));return true;
+}
+function connect(){
+  clearTimeout(timer);
+  ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
+  ws.onopen=()=>{back=800;setLink('ok','已连接');ws.send(JSON.stringify({type:C2S.HELLO,role:'host',key}))};
+  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}handle(m)};
+  ws.onclose=()=>{diagnose();timer=setTimeout(connect,back);back=Math.min(back*2,8000)};
+  ws.onerror=()=>{try{ws.close()}catch{}};
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ws?.readyState!==1){back=800;connect()}});
+
+function handle(m){
+  if(m.type===S2C.REJECTED){
+    if(m.reason==='badKey'){setLink('srv','口令不对');$('#qcard').innerHTML='<div class=qno>主持人口令不对，检查链接里的 key</div>';return}
+    toast('这一步做不了：'+(m.reason||''));return;
+  }
+  if(m.type==='csv')return download(m.filename,m.content);
+  if(m.type===S2C.GUEST_LIST){guests=m.guests||[];return renderGuests()}
+  if(m.type===S2C.SNAPSHOT&&m.host)Object.assign(H,m.host);
+  if(m.type===S2C.HOST_STATE)Object.assign(H,m);
+  if(m.type===S2C.SNAPSHOT||m.type===S2C.HOST_STATE){
+    if(!startedAt&&H.qIndex>=0)startedAt=Date.now();
+    render();
+  }
+}
+
+function download(name,text){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'}));
+  a.download=name;a.click();URL.revokeObjectURL(a.href);
+  toast('已导出');
+}
+
+/* ── 时间预算：主持人全程不知道自己有没有超时 ── */
+setInterval(()=>{
+  const el=$('#clock');if(!el)return;
+  if(!startedAt){el.textContent='0:00';return}
+  const s=Math.floor((Date.now()-startedAt)/1000);
+  el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  const left=H.total-(H.qIndex+1);
+  const pace=H.qIndex>=0?s/(H.qIndex+1):0;      // 每题实际耗时
+  el.className='num'+(pace*H.total>20*60?' over':'');
+  el.title='按当前速度，全场约 '+Math.round(pace*H.total/60)+' 分钟';
+},1000);
+
+function render(){
+  $('#bank').textContent=H.bank||'—';
+  $('#bank').className='tag'+(/正式/.test(H.bank||'')?' live':'');
+
+  // 题干与答案 —— 主持人照着这里念，不用扭头看大屏
+  const q=$('#qcard');
+  if(H.qIndex<0||!H.text){
+    q.innerHTML='<div class=qno>'+(H.stage===STAGE.FINAL?'已结束':'尚未开始')+'</div>'+
+      '<div class=qtext>共 '+(H.total||0)+' 道题，已入场 '+H.joined+' 位</div>';
+  }else{
+    q.innerHTML='<div class=qno>第 '+(H.qIndex+1)+' 题 / '+H.total+
+      (H.voided?' · 本题已作废':'')+'</div><div class=qtext>'+esc(H.text)+'</div>'+
+      H.options.map((o,i)=>'<div class="opt'+(i===H.correctIndex&&!H.voided?' right':'')+'">'+
+        '<span class=k>'+'ABCD'[i]+'</span><span>'+esc(o)+'</span></div>').join('');
+  }
+
+  // 唱分四项
+  $('#say').innerHTML=
+    '<div><b class=num>'+H.answered+' / '+H.joined+'</b><span>已作答</span></div>'+
+    '<div><b class=num>'+H.correctCount+'</b><span>答对</span></div>'+
+    '<div class=lead><b>'+esc(H.leader?.nickname||'—')+'</b><span>当前第一 '+(H.leader?.total??0)+' 分</span></div>';
+
+  // 主操作
+  const go=$('#go');
+  const st=H.stage;
+  if(st===STAGE.IDLE){go.textContent='开始游戏';go.className='primary';go.disabled=false;go.dataset.a=C2S.HOST_START}
+  else if(st===STAGE.READY||st===STAGE.REVEAL){
+    const last=H.qIndex+1>=H.total;
+    go.textContent=last?'公布最终排名':'下一题';
+    go.className='primary'+(last?' calm':'');go.disabled=false;
+    go.dataset.a=last?C2S.HOST_FINISH:C2S.HOST_NEXT;
+  }
+  else if(st===STAGE.ASKING){go.textContent='提前结算本题';go.className='primary calm';go.disabled=false;go.dataset.a=C2S.HOST_EARLY_SETTLE}
+  else if(st===STAGE.PAUSED){go.textContent='继续答题';go.className='primary';go.disabled=false;go.dataset.a=C2S.HOST_RESUME}
+  else {go.textContent='已结束';go.disabled=true;go.dataset.a=''}
+
+  // 救场：危险的放右列、加 danger 色、要二次确认
+  const asking=st===STAGE.ASKING,reveal=st===STAGE.REVEAL;
+  $('#rescue').innerHTML=[
+    ['延长 10 秒',C2S.HOST_EXTEND,!asking,0],
+    [st===STAGE.PAUSED?'继续':'暂停',st===STAGE.PAUSED?C2S.HOST_RESUME:C2S.HOST_PAUSE,!(asking||st===STAGE.PAUSED),0],
+    ['重新公布结果',C2S.HOST_REPUBLISH,!reveal,0],
+    ['把二维码打回大屏',C2S.HOST_SHOW_QR,false,0],
+    ['跳过本题（全员 0 分）',C2S.HOST_SKIP,!(asking||reveal||st===STAGE.PAUSED),1],
+    ['换一道备用题',C2S.HOST_BACK,!reveal||!H.hasSpare,1],
+  ].map(([t,a,dis,danger])=>'<button data-a="'+a+'"'+(danger?' data-confirm="1" class=danger':'')+
+      (dis?' disabled':'')+'>'+t+'</button>').join('');
+
+  renderGuests();
+}
+
+function renderGuests(){
+  const kw=$('#find').value.trim();
+  const rows=guests.filter(g=>!kw||g.nickname.includes(kw)).slice(0,8);
+  $('#list').innerHTML=rows.map(g=>'<div class=who><u>'+esc(g.nickname)+'</u>'+
+    '<span class=num>'+g.total+'</span>'+
+    '<button data-n="'+esc(g.clientId)+'">换名字</button>'+
+    '<button class=danger data-r="'+esc(g.clientId)+'">移除</button></div>').join('')||
+    (kw?'<div class=who><u>没找到</u></div>':'');
+}
+$('#find').oninput=renderGuests;
+// 宾客列表按需拉，不塞进 hostState —— 否则每次有人作答都要推 400 条
+document.querySelectorAll('details')[1].addEventListener('toggle',e=>{
+  if(e.target.open)send({type:C2S.HOST_GUESTS,expectedQIndex:H.qIndex});
+});
+
+/* ── 点击：二次确认只加在不可逆操作上 ──────────────────────
+   可撤销的操作不要拦。上一版把确认加在「回到上一题」这种还能补救的动作上，
+   反倒是全员清零的「跳过」裸奔。 */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-a]');
+  if(b){
+    if(b.disabled)return;
+    const a=b.dataset.a;if(!a)return;
+    if(b.dataset.confirm&&!confirm(b.textContent+'？这一步不可撤销。'))return;
+    if(send({type:a,expectedQIndex:H.qIndex}))toast('已发送：'+b.textContent.replace(/（.*/,''));
+    return;
+  }
+  const n=e.target.closest('button[data-n]');
+  if(n){send({type:C2S.HOST_NEXT_NICKNAME,clientId:n.dataset.n,expectedQIndex:H.qIndex});toast('已重新发放昵称');return}
+  const r=e.target.closest('button[data-r]');
+  if(r){
+    if(!confirm('移除这位宾客？其成绩会一并删除，不可撤销。'))return;
+    send({type:C2S.HOST_REMOVE,clientId:r.dataset.r,expectedQIndex:H.qIndex});toast('已移除');
+  }
+});
+$('#csv').onclick=()=>send({type:C2S.HOST_EXPORT});
+
+connect();render();
+</script>
+</html>

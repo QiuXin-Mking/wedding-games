@@ -36,6 +36,8 @@ export const C2S = Object.freeze({
   HOST_NEXT_NICKNAME: 'host:nextNickname',
   HOST_REMOVE: 'host:remove',
   HOST_SHOW_QR: 'host:showQr',
+  /** 按需拉宾客列表。不塞进 hostState —— 400 人 × 每次作答会推出几 MB 无谓流量 */
+  HOST_GUESTS: 'host:guests',
   HOST_EXPORT: 'host:export',
 });
 
@@ -69,6 +71,10 @@ export const S2C = Object.freeze({
   RESUMED: 'resumed',
   /** 主持人专用：题干/答案 + 唱分四项 + 时间预算 + 连接状态 */
   HOST_STATE: 'hostState',
+  /** 主持人按需拉到的宾客列表 */
+  GUEST_LIST: 'guestList',
+  /** 让大屏重新打出入口二维码，给迟到的人扫 */
+  SHOW_QR: 'qr',
   REJECTED: 'rejected',
   PONG: 'pong',
 });

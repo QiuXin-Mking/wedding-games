@@ -1,3 +1,277 @@
-<!doctype html><meta charset="utf-8">
-<title>占位 · index</title>
-<p>占位页面，第 5 步替换为真正的 index 端。</p>
+<!doctype html><html lang=zh-CN><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>婚礼答题</title><div id=boot style="position:fixed;inset:0;display:grid;place-content:center;justify-items:center;gap:20px;background:#F7F1E8;color:#6B5344;font:19px/1.5 'Songti SC',serif;text-align:center">正在进入…<div style="width:168px;height:3px;background:rgba(61,43,35,.1);border-radius:2px;overflow:hidden"><i id=bar style="display:block;height:100%;background:#C8362F;transform:scaleX(.04);transform-origin:left;transition:transform .35s cubic-bezier(.23,1,.32,1)"></i></div></div><script>
+/* 进度由文件里每隔约 20% 的 p(n) 调用推进 —— 浏览器解析到哪就报到哪，
+   是真实进度，不是定时器假动画。假进度条卡在 90% 比白屏更折磨人。 */
+p=function(n){var b=document.getElementById('bar');if(b)b.style.transform='scaleX('+n/100+')'}
+</script><style>
+/* boot 之外的一切都在这之后 —— 上面那段必须先于它到达，
+   浏览器边收边渲染，400 人集中扫码时每人只分到约 900 B/s。 */
+:root{--paper:#F7F1E8;--ink:#3D2B23;--ink2:#6B5344;--ink3:#9A8877;--seal:#C8362F;--gold:#C9A227;--line:rgba(61,43,35,.10);--line2:rgba(61,43,35,.18)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased;text-wrap:pretty}
+/* ── 版式 ─────────────────────────────── */
+.serif{font-family:"Songti SC","Noto Serif CJK SC",serif}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ── 骨架：顶条 / 主体 / 底条 ───────────── */
+#app{display:none;min-height:100dvh;flex-direction:column}
+#app.on{display:flex}
+#top{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:2}
+#me{flex:1;min-width:0;font:600 17px/1.3 "Songti SC","Noto Serif CJK SC",serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tick{font:600 20px/1 system-ui;color:var(--seal);min-width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
+#tick.idle{color:var(--ink3);font-size:13px;font-weight:500}
+#prog{height:2px;background:var(--line)}
+#prog i{display:block;height:100%;background:var(--seal);transform-origin:left}
+main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-content:center;gap:18px}
+#hint{padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);border-top:1px solid var(--line);color:var(--ink2);font-size:14px;text-align:center;background:var(--paper)}
+
+/* ── 题干：手机端的主视觉 ──────────────── */
+.qno{color:var(--ink3);font-size:13px;letter-spacing:.06em}
+.qtext{font:600 22px/1.45 "Songti SC","Noto Serif CJK SC",serif;text-wrap:balance;margin:2px 0 4px}
+
+/* ── 选项：像喜帖上的条目，不是一排按钮 ── */
+.opts{display:grid;gap:10px}
+.opt{position:relative;display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 64px 12px 14px;border:1px solid var(--line2);border-radius:10px;background:transparent;color:inherit;font:400 17px/1.4 inherit;text-align:left;cursor:pointer;transition:border-color .16s,background-color .16s,transform .12s cubic-bezier(.23,1,.32,1)}
+.opt:active{transform:scale(.985)}
+.opt .k{flex:none;width:26px;height:26px;border:1px solid var(--line2);border-radius:50%;display:grid;place-content:center;font:500 13px/1 system-ui;color:var(--ink2);transition:border-color .16s,color .16s}
+.opt[aria-pressed=true]{border-color:var(--seal);background:rgba(200,54,47,.045)}
+.opt[aria-pressed=true] .k{border-color:var(--seal);color:var(--seal)}
+.opt.right{border-color:var(--gold);background:rgba(201,162,39,.09)}
+.opt.wrong{opacity:.45}
+.opts.lock .opt{cursor:default}
+/* 印章：本产品的签名动作 */
+.seal{position:absolute;right:12px;top:50%;width:46px;height:46px;border:2px solid var(--seal);border-radius:7px;color:var(--seal);display:grid;place-content:center;font:600 19px/1 "Songti SC","Noto Serif CJK SC",serif;transform:translateY(-50%) rotate(-16deg) scale(1.9);opacity:0;transition:transform .34s cubic-bezier(.23,1,.32,1),opacity .18s;pointer-events:none}
+.opt[aria-pressed=true] .seal{transform:translateY(-50%) rotate(-7deg) scale(1);opacity:1}
+
+/* ── 入场 / 揭晓 ───────────────────────── */
+.mid{display:grid;justify-items:center;gap:16px;text-align:center}
+.rule{width:0;height:1px;background:var(--gold);transition:width .55s cubic-bezier(.23,1,.32,1)}
+.show .rule{width:132px}
+.name{font:600 30px/1.3 "Songti SC","Noto Serif CJK SC",serif;opacity:0;transform:scale(.94);transition:opacity .3s .12s,transform .45s .12s cubic-bezier(.23,1,.32,1)}
+.show .name{opacity:1;transform:scale(1)}
+.sub{color:var(--ink2);font-size:15px;opacity:0;transition:opacity .3s .34s}
+.show .sub{opacity:1}
+.btn{min-height:52px;padding:0 34px;border:0;border-radius:10px;background:var(--seal);color:#fff;font:600 17px/1 inherit;cursor:pointer;transition:transform .12s cubic-bezier(.23,1,.32,1),opacity .16s}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5}
+
+/* ── 结算 ─────────────────────────────── */
+.verdict{font:600 26px/1.3 "Songti SC","Noto Serif CJK SC",serif}
+.verdict.ok{color:var(--seal)}
+.verdict.no{color:var(--ink2)}
+.gain{font:600 40px/1 system-ui;font-variant-numeric:tabular-nums}
+.stats{display:flex;gap:22px;justify-content:center;color:var(--ink2);font-size:14px}
+.stats b{display:block;font:600 19px/1.3 system-ui;color:var(--ink);font-variant-numeric:tabular-nums}
+#notice{margin:0 16px;padding:10px 14px;border-left:3px solid var(--gold);background:rgba(201,162,39,.10);color:var(--ink2);font-size:14.5px;border-radius:0 8px 8px 0}
+.top10{width:100%;max-width:340px;display:grid;gap:6px}
+.top10 div{display:flex;gap:10px;padding:7px 10px;border-radius:7px;font-size:15px}
+.top10 div.mine{background:rgba(200,54,47,.08);font-weight:600}
+.top10 s{flex:none;width:1.6em;color:var(--ink3);text-decoration:none;font-variant-numeric:tabular-nums}
+.top10 u{flex:1;min-width:0;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style><script>p(45)</script><div id=app>
+<div id=top><div id=me>&nbsp;</div><div id=tick class=idle></div></div>
+<div id=prog><i style="transform:scaleX(0)"></i></div>
+<div id=notice hidden></div>
+<main id=view></main>
+<div id=hint></div>
+</div><script>p(70)</script>
+<script type=module>
+import {C2S,S2C,STAGE,OUTCOME} from '/src/protocol.js';
+p(85);
+
+/* localStorage 在 iOS 无痕下会抛异常。全部包起来并退化为内存态 —— 宁可刷新丢身份，
+   也不能白屏。 */
+const mem={};
+const ls={
+  get(k){try{return localStorage.getItem(k)}catch{return mem[k]??null}},
+  set(k,v){try{localStorage.setItem(k,v)}catch{mem[k]=v}}
+};
+let cid=ls.get('cid');
+if(!cid){cid=(crypto.randomUUID?.()||String(Math.random()).slice(2)+Date.now());ls.set('cid',cid)}
+
+const $=s=>document.querySelector(s);
+const view=$('#view'),hint=$('#hint'),tick=$('#tick'),meEl=$('#me'),notice=$('#notice');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const S={stage:null,me:null,q:null,my:null,reveal:null,final:null,joined:0,answered:0,sent:null,pending:null};
+let offset=0,deadline=0,raf=0;
+
+/* ── 对时：5 次探针取 rtt 最小的样本 ───────────────────────── */
+const probes=[];
+function sync(){for(let i=0;i<5;i++)setTimeout(()=>send({type:C2S.SYNC,t0:Date.now()}),i*120)}
+function onPong(m){
+  const t3=Date.now(),rtt=t3-m.t0;
+  probes.push({rtt,off:m.t1-(m.t0+rtt/2)});
+  probes.sort((a,b)=>a.rtt-b.rtt);
+  offset=probes[0].off;   // 最小 rtt 的样本受排队延迟污染最少
+}
+
+/* ── 倒计时：本地推进，不逐秒依赖网络 ──────────────────────── */
+function runTick(){
+  cancelAnimationFrame(raf);
+  const bar=$('#prog i');
+  const step=()=>{
+    const left=deadline-offset-Date.now();
+    if(left<=0){tick.textContent='0';bar.style.transform='scaleX(0)';return}
+    tick.textContent=Math.ceil(left/1000);
+    bar.style.transform='scaleX('+Math.max(0,Math.min(1,left/20000))+')';
+    raf=requestAnimationFrame(step);
+  };
+  step();
+}
+function stopTick(txt){cancelAnimationFrame(raf);tick.className='idle';tick.textContent=txt||'';$('#prog i').style.transform='scaleX(0)'}
+
+/* ── 连接：指数退避，但回到前台立即重连 ─────────────────────── */
+let ws=null,back=800,timer=0;
+function send(m){if(ws?.readyState===1)ws.send(JSON.stringify(m))}
+function connect(){
+  clearTimeout(timer);
+  ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
+  ws.onopen=()=>{back=800;send({type:C2S.HELLO,role:'guest',clientId:cid});sync()};
+  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}handle(m)};
+  ws.onclose=()=>{timer=setTimeout(connect,back);back=Math.min(back*2,8000)};
+  ws.onerror=()=>{try{ws.close()}catch{}};
+}
+// 点亮屏幕正赶上 8 秒那一档的话，一道 20 秒的题就废了
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&ws?.readyState!==1){back=800;connect()}
+});
+
+/* ── 消息 ──────────────────────────────────────────────── */
+function handle(m){
+  switch(m.type){
+    case S2C.PONG:return onPong(m);
+    case S2C.SNAPSHOT:{
+      S.stage=m.stage;S.joined=m.joined;S.answered=m.answered;
+      if(m.me)S.me=m.me;
+      S.q=m.question||null;S.reveal=m.reveal||null;S.my=m.myResult||null;
+      S.final=m.final||null;
+      if(S.q){deadline=S.q.deadlineAt;S.sent=S.q.mySubmitted?S.q.myOption:null}
+      return render();
+    }
+    case S2C.IDENTITY:S.me={clientId:m.clientId,nickname:m.nickname,total:0,correctCount:0};S.stage='REVEALING';return render();
+    case S2C.QUESTION:
+      S.q=m;S.my=null;S.reveal=null;S.stage=STAGE.ASKING;
+      // extend 会重播 question。载荷带着 mySubmitted/myOption，
+      // 所以整体重渲染不会冲掉已提交态。
+      S.sent=m.mySubmitted?m.myOption:null;S.pending=null;
+      deadline=m.deadlineAt;return render();
+    case S2C.ANSWER_ACK:
+      S.pending=null;
+      // 只有服务端确认收到，才敢说「已提交」
+      if(m.accepted)S.sent=m.optionIndex;
+      return render();
+    case S2C.PROGRESS:S.joined=m.joined;S.answered=m.answered;return paintHint();
+    case S2C.REVEAL:S.reveal=m;S.stage=STAGE.REVEAL;return render();
+    case S2C.MY_RESULT:S.my=m;S.stage=STAGE.REVEAL;return render();
+    case S2C.FINAL:S.final=m.top10;S.stage=STAGE.FINAL;return render();
+    case S2C.MY_FINAL:S.myFinal=m;S.stage=STAGE.FINAL;return render();
+    case S2C.PAUSED:S.paused=true;return render();
+    case S2C.RESUMED:S.paused=false;deadline=Date.now()+offset+(m.remainMs||0);return render();
+    case S2C.NOTICE:return flash(m.text);
+  }
+}
+let noticeT=0;
+function flash(t){notice.textContent=t;notice.hidden=false;clearTimeout(noticeT);noticeT=setTimeout(()=>{notice.hidden=true},7000)}
+
+/* ── 渲染：收到消息整体重画，不做增量对账 ───────────────────── */
+function render(){
+  $('#boot').remove?.();document.getElementById('boot')?.remove();
+  $('#app').classList.add('on');
+  meEl.textContent=S.me?.nickname||'';
+  const st=S.stage;
+
+  if(!S.me){
+    view.innerHTML='<div class="mid show"><div class="name serif">婚礼答题</div>'+
+      '<div class=rule></div><div class=sub>点下面的按钮，系统给你取个名字</div>'+
+      '<button class=btn id=go>进　入</button></div>';
+    $('#go').onclick=e=>{e.target.disabled=true;send({type:C2S.JOIN,clientId:cid})};
+    stopTick();hint.textContent='不用打字，也不用填手机号';return;
+  }
+  if(st==='REVEALING'){
+    view.innerHTML='<div class="mid" id=rv><div class=sub>你的名字是</div>'+
+      '<div class="name serif">'+esc(S.me.nickname)+'</div><div class=rule></div>'+
+      '<div class=sub>记住它，等下大屏上就认这个名字</div>'+
+      '<button class=btn id=ok>好　的</button></div>';
+    requestAnimationFrame(()=>$('#rv').classList.add('show'));
+    $('#ok').onclick=()=>{S.stage=S.stage==='REVEALING'?STAGE.READY:S.stage;render()};
+    stopTick();hint.textContent='中途退出没关系，再扫一次桌上的码就回来，分不会丢';return;
+  }
+  if(st===STAGE.ASKING||st===STAGE.PAUSED)return paintAsk();
+  if(st===STAGE.REVEAL)return paintResult();
+  if(st===STAGE.FINAL)return paintFinal();
+  return paintWait();
+}
+
+function paintWait(){
+  view.innerHTML='<div class="mid show"><div class="name serif">'+esc(S.me.nickname)+'</div>'+
+    '<div class=rule></div><div class=sub>已经进来 <b class=num>'+S.joined+'</b> 位宾客</div>'+
+    '<div class=sub>等主持人开始</div></div>';
+  stopTick();
+  hint.textContent='答得越快，分越高';
+}
+
+function paintAsk(){
+  const q=S.q;if(!q)return paintWait();
+  const locked=S.paused;
+  view.innerHTML='<div><div class=qno>第 <span class=num>'+(q.qIndex+1)+'</span> 题 / '+q.total+'</div>'+
+    '<div class=qtext>'+esc(q.text)+'</div></div>'+
+    '<div class="opts'+(locked?' lock':'')+'">'+q.options.map((o,i)=>
+      '<button class=opt type=button aria-pressed="'+(S.sent===i)+'" data-i="'+i+'">'+
+      '<span class=k>'+'ABCD'[i]+'</span><span>'+esc(o)+'</span>'+
+      '<span class=seal aria-hidden=true>答</span></button>').join('')+'</div>';
+  view.querySelectorAll('.opt').forEach(b=>{
+    b.onclick=()=>{
+      if(S.paused)return;
+      const i=+b.dataset.i;
+      S.pending=i;
+      // 乐观高亮但不盖章 —— 盖章要等服务端回执
+      send({type:C2S.ANSWER,qIndex:q.qIndex,optionIndex:i});
+      paintHint();
+    };
+  });
+  tick.className='';runTick();paintHint();
+}
+
+function paintHint(){
+  if(S.stage===STAGE.ASKING||S.stage===STAGE.PAUSED){
+    hint.textContent=S.paused?'暂停中，稍等片刻'
+      :S.sent!==null?('已提交，还能改 · 已答 '+S.answered+' / '+S.joined)
+      :S.pending!==null?'正在提交…'
+      :'请点一个答案';
+  }
+}
+
+function paintResult(){
+  const my=S.my,rv=S.reveal;
+  const voided=rv?.voided;
+  const ok=my?.outcome===OUTCOME.CORRECT;
+  const word=voided?'本题作废':ok?'答对了':my?.outcome===OUTCOME.TIMEOUT?'没赶上':'答错了';
+  view.innerHTML='<div class="mid show">'+
+    '<div class="verdict '+(ok?'ok':'no')+'">'+word+'</div>'+
+    (voided?'':'<div class="gain num">'+(my?.gained>0?'+'+my.gained:'0')+'</div>')+
+    '<div class=rule></div>'+
+    '<div class=stats><div>总分<b class=num>'+(my?.total??0)+'</b></div>'+
+    (my?.rank?'<div>名次<b class=num>'+my.rank+' / '+my.of+'</b></div>':'')+'</div></div>';
+  stopTick('已结算');
+  hint.textContent=voided?'这题所有人都不计分，不是你的问题':'看大屏，下一题马上来';
+}
+
+function paintFinal(){
+  const f=S.myFinal,list=S.final||[];
+  view.innerHTML='<div class="mid show"><div class=sub>全部答完了</div>'+
+    '<div class="name serif">'+esc(S.me.nickname)+'</div>'+
+    '<div class=stats><div>名次<b class=num>'+(f?.rank??'-')+' / '+(f?.of??'-')+'</b></div>'+
+    '<div>总分<b class=num>'+(f?.total??0)+'</b></div>'+
+    '<div>答对<b class=num>'+(f?.correctCount??0)+'</b></div></div>'+
+    '<div class=rule></div>'+
+    (list.length?'<div class=top10>'+list.map(r=>'<div class="'+(r.nickname===S.me.nickname?'mine':'')+'">'+
+      '<s class=num>'+r.rank+'</s><u>'+esc(r.nickname)+'</u><s class=num>'+r.total+'</s></div>').join('')+'</div>':'');
+  stopTick();
+  hint.textContent=(f&&f.rank<=10)?'你上大屏了':'谢谢参与，去看看大屏的前十名';
+}
+
+p(100);connect();
+</script>
+</html>

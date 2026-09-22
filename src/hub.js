@@ -139,6 +139,21 @@ export class Hub {
       return { ok: true, csv: exportDetailCsv(this.game) };
     }
 
+    // 纯展示类动作，不碰游戏状态，也不写日志
+    if (type === C2S.HOST_SHOW_QR) {
+      this.broadcast({ type: S2C.SHOW_QR, on: true }, (m) => m.role === ROLE.SCREEN);
+      return { ok: true, events: [] };
+    }
+    if (type === C2S.HOST_GUESTS) {
+      this.send(ws, {
+        type: S2C.GUEST_LIST,
+        guests: [...this.game.guests.values()].map((g) => ({
+          clientId: g.clientId, nickname: g.nickname, total: this.game.tally(g.clientId).total,
+        })),
+      });
+      return { ok: true, events: [] };
+    }
+
     const before = this.game.stage;
     const r = this.game.hostAction(type, payload, now());
     if (!r.ok) {
