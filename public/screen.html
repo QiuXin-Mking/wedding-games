@@ -27,6 +27,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 .title{font:600 4.6vw/1.2 "Songti SC","Noto Serif CJK SC",serif}
 .rule{width:14vw;height:2px;background:var(--gold)}
 .lead{font-size:1.5vw;color:var(--ink2)}
+.keybox{display:grid;gap:1.6vh;justify-items:center;max-width:36vw;margin:0 auto}
+.keybox .err{color:var(--seal);font-weight:600;min-height:1.6vw}
+.keybox input{width:100%;font:500 2.2vw/1 system-ui;text-align:center;letter-spacing:.12em;
+  padding:1.4vh 1vw;border:1px solid var(--line2);border-radius:.7vw;background:#fff;color:var(--ink)}
+.keybox input:focus{outline:none;border-color:var(--seal)}
+.keybox button{font:600 1.7vw/1 system-ui;padding:1.3vh 3vw;border:0;border-radius:.7vw;
+  background:var(--seal);color:#fff;cursor:pointer;letter-spacing:.1em}
 #qr{width:26vh;height:26vh;border:.5vh solid #fff;box-shadow:0 0 0 1px var(--line);background:#fff}
 .url{font:600 1.5vw/1 system-ui;letter-spacing:.02em;color:var(--ink2)}
 .count{font:600 3.4vw/1 system-ui;font-variant-numeric:tabular-nums}
@@ -77,7 +84,10 @@ import {C2S,S2C,STAGE,ROLE} from '/src/protocol.js';
 const $=s=>document.querySelector(s);
 const stage=$('#stage'),conn=$('#conn');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const key=new URLSearchParams(location.search).get('key')||'';
+/* 口令：链接里带的优先，其次上次输过的。
+   两个都没有也不要紧 —— 会就地弹出输入框，不逼人回去找正确的链接。
+   当天守大屏的多半不是技术的人，「口令不对，请检查链接里的 key」对他等于没说。 */
+let key=new URLSearchParams(location.search).get('key')||localStorage.getItem('wq_screen_key')||'';
 
 /* 二维码由 tools/genqr.js 离线生成。还没生成时降级为文字地址，不显示裂图。
    写成函数而不是内联属性 —— 内联属性里的引号嵌在 JS 字符串里，极易把字符串截断。 */
@@ -116,12 +126,32 @@ function connect(){
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ws?.readyState!==1){back=800;connect()}});
 
+/* 就地补口令。用 DOM 拼而不是 innerHTML —— 要绑事件，也避开引号截断字符串那类事故。
+   输入框是 password：大屏此刻可能已经投在全场面前，口令不能亮出来给人拍照。 */
+let keyBox=null;
+function askKey(err){
+  if(keyBox){const e=keyBox.querySelector('.err');if(e)e.textContent=err;keyBox.querySelector('input').select();return}
+  stage.innerHTML='';
+  const box=document.createElement('div');box.className='keybox';
+  const h=document.createElement('div');h.className='title serif';h.textContent='请输入大屏口令';
+  const er=document.createElement('div');er.className='lead err';er.textContent=err;
+  const inp=document.createElement('input');inp.type='password';inp.autocomplete='off';inp.setAttribute('aria-label','大屏口令');
+  const btn=document.createElement('button');btn.textContent='进　入';
+  const tip=document.createElement('div');tip.className='lead';tip.textContent='口令找婚礼的技术负责人要，输一次就会记住';
+  const go=()=>{
+    const v=inp.value.trim();if(!v)return;
+    key=v;try{localStorage.setItem('wq_screen_key',v)}catch{}
+    keyBox=null;stage.innerHTML='<div class="title serif">正在进入…</div>';
+    send({type:C2S.HELLO,role:ROLE.SCREEN,key});
+  };
+  btn.onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()};
+  box.append(h,er,inp,btn,tip);stage.append(box);keyBox=box;inp.focus();
+}
+
 function handle(m){
   switch(m.type){
     case S2C.PONG:return onPong(m);
-    case S2C.REJECTED:
-      stage.innerHTML='<div class="title serif">口令不对</div><div class=lead>请检查大屏链接里的 key</div>';
-      return;
+    case S2C.REJECTED:return askKey(key?'口令不对，再试一次':'');
     case S2C.SNAPSHOT:
       S.stage=m.stage;S.joined=m.joined;S.answered=m.answered;$('#bank').textContent=m.bank||'—';
       $('#bank').className=/正式/.test(m.bank||'')?'live':'';

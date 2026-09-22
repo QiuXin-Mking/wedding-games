@@ -30,6 +30,11 @@ main{flex:1;padding:14px;display:flex;flex-direction:column;gap:14px}
 
 /* ── 题干与答案：主持人要照着念，字必须大 ── */
 .card{border:1px solid var(--line);border-radius:12px;padding:14px}
+.keybox{display:grid;gap:12px;justify-items:stretch;padding:6px 0}
+.keybox .err{color:var(--seal);font-weight:600;font-size:14px;min-height:18px;text-align:center}
+.keybox input{width:100%;font:500 19px/1 system-ui;text-align:center;letter-spacing:.1em;padding:13px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:inherit}
+.keybox input:focus{outline:none;border-color:var(--seal)}
+.keybox button{font:600 16px/1 system-ui;min-height:48px;border:0;border-radius:9px;background:var(--seal);color:#fff;letter-spacing:.08em}
 .qno{font-size:13px;color:var(--ink3);letter-spacing:.06em}
 .qtext{font:600 21px/1.4 "Songti SC","Noto Serif CJK SC",serif;margin:4px 0 12px;text-wrap:balance}
 .opt{display:flex;gap:10px;align-items:center;padding:7px 0;font-size:17px;border-top:1px solid var(--line)}
@@ -99,7 +104,9 @@ details[open] summary::after{content:'▴'}
 import {C2S,S2C,STAGE,ROLE,REJECT} from '/src/protocol.js';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const key=new URLSearchParams(location.search).get('key')||'';
+/* 链接里带的优先，其次上次输过的。两个都没有会就地弹输入框 ——
+   台上不该因为手里那份链接是旧的就进不去。 */
+let key=new URLSearchParams(location.search).get('key')||localStorage.getItem('wq_host_key')||'';
 
 let H={stage:null,qIndex:-1,total:0,joined:0,answered:0,correctCount:0,text:null,options:[],correctIndex:-1,leader:null,hasSpare:true,voided:false,bank:'—'};
 let startedAt=0,guests=[];
@@ -136,9 +143,33 @@ function connect(){
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ws?.readyState!==1){back=800;connect()}});
 
+/* 就地补口令。DOM 拼装而非 innerHTML —— 要绑事件，也避开引号截断字符串那类事故。
+   主持人端在手机上，不会投给全场，所以用普通文本框，台上好输。 */
+let keyBox=null;
+function askKey(err){
+  const host=$("#qcard");
+  if(keyBox){const e=keyBox.querySelector(".err");if(e)e.textContent=err;keyBox.querySelector("input").select();return}
+  host.innerHTML="";
+  const box=document.createElement("div");box.className="keybox";
+  const h=document.createElement("div");h.className="qno";h.textContent="请输入主持人口令";
+  const er=document.createElement("div");er.className="err";er.textContent=err;
+  const inp=document.createElement("input");inp.type="text";inp.autocomplete="off";
+  inp.autocapitalize="off";inp.spellcheck=false;inp.setAttribute("aria-label","主持人口令");
+  const btn=document.createElement("button");btn.textContent="进 入";
+  const tip=document.createElement("div");tip.className="qno";tip.textContent="找技术负责人要，输一次就会记住";
+  const go=()=>{
+    const v=inp.value.trim();if(!v)return;
+    key=v;try{localStorage.setItem("wq_host_key",v)}catch{}
+    keyBox=null;host.innerHTML="<div class=qno>正在进入…</div>";
+    send({type:C2S.HELLO,role:ROLE.HOST,key});
+  };
+  btn.onclick=go;inp.onkeydown=e=>{if(e.key==="Enter")go()};
+  box.append(h,er,inp,btn,tip);host.append(box);keyBox=box;inp.focus();
+}
+
 function handle(m){
   if(m.type===S2C.REJECTED){
-    if(m.reason===REJECT.BAD_KEY){setLink('srv','口令不对');$('#qcard').innerHTML='<div class=qno>主持人口令不对，检查链接里的 key</div>';return}
+    if(m.reason===REJECT.BAD_KEY){setLink('srv','需要口令');return askKey(key?'口令不对，再试一次':'')}
     toast('这一步做不了：'+(m.reason||''));return;
   }
   if(m.type===S2C.CSV)return download(m.filename,m.content);

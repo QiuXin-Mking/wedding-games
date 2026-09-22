@@ -1,0 +1,294 @@
+<!doctype html><html lang=zh-CN><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>这个环节是怎么玩的 · 婚礼答题</title>
+<style>
+:root{--paper:#F7F1E8;--card:#FCF8F2;--ink:#3D2B23;--ink2:#6B5344;--ink3:#9A8877;
+      --seal:#C8362F;--gold:#C9A227;--gold2:#A88520;--line:rgba(61,43,35,.10);--line2:rgba(61,43,35,.18)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--paper);color:var(--ink);
+     font:16px/1.8 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+     -webkit-font-smoothing:antialiased;text-wrap:pretty}
+.wrap{max-width:680px;margin:0 auto;padding:0 20px calc(env(safe-area-inset-bottom) + 60px)}
+p{margin:10px 0}
+b{font-weight:600}
+
+/* ── 开篇 ───────────────────────────────── */
+header{padding:56px 0 8px;text-align:center}
+.kicker{font:500 12px/1 system-ui;color:var(--gold2);letter-spacing:.24em;margin-bottom:16px}
+h1{font:600 clamp(28px,7.4vw,38px)/1.35 "Songti SC","Noto Serif CJK SC",serif;margin:0;letter-spacing:.01em}
+.lede{color:var(--ink2);font-size:17px;line-height:1.85;margin:18px auto 0;max-width:30em}
+.seal{display:inline-grid;place-content:center;width:52px;height:52px;margin:28px auto 0;
+      background:var(--seal);color:#fff;border-radius:9px;
+      font:600 19px/1 "Songti SC",serif;letter-spacing:.06em;
+      box-shadow:0 3px 10px rgba(200,54,47,.26)}
+
+/* ── 三块屏幕 ───────────────────────────── */
+.screens{display:grid;gap:12px;margin:34px 0 0}
+@media(min-width:620px){.screens{grid-template-columns:repeat(3,1fr)}}
+.sc{background:var(--card);border:1px solid var(--line2);border-radius:13px;padding:17px 16px}
+.sc h4{margin:0 0 3px;font:600 16px/1.5 system-ui}
+.sc .who{color:var(--gold2);font:500 11px/1 system-ui;letter-spacing:.14em;margin-bottom:9px}
+.sc p{margin:0;font-size:14px;line-height:1.75;color:var(--ink2)}
+
+/* ── 流程卷轴：这一页的主体 ─────────────── */
+.flow{position:relative;margin:14px 0 0;padding-left:34px}
+.flow::before{content:"";position:absolute;left:11px;top:14px;bottom:26px;width:1px;
+              background:linear-gradient(var(--gold),rgba(201,162,39,.18))}
+.stop{position:relative;padding:26px 0 6px}
+.stop::before{content:"";position:absolute;left:-28px;top:34px;width:9px;height:9px;border-radius:50%;
+              background:var(--seal);box-shadow:0 0 0 4px var(--paper)}
+.stop .n{font:500 11px/1 system-ui;color:var(--gold2);letter-spacing:.2em}
+.stop h3{margin:7px 0 0;font:600 20px/1.45 "Songti SC","Noto Serif CJK SC",serif}
+.stop .say{color:var(--ink2);font-size:15px;margin:8px 0 0}
+
+/* ── 屏幕小样：让人一眼看到「那一刻是什么」 ── */
+.demo{margin:15px 0 0;display:flex;gap:11px;align-items:flex-start;flex-wrap:wrap}
+.dev{background:var(--card);border:1px solid var(--line2);border-radius:10px;overflow:hidden}
+.dev .cap{font:500 10px/1 system-ui;color:var(--ink3);letter-spacing:.1em;
+          padding:7px 9px;border-bottom:1px solid var(--line);background:rgba(61,43,35,.02)}
+.dev .in{padding:11px 10px}
+.phone{width:132px}
+.tv{flex:1;min-width:190px}
+.mini{font-size:11px;line-height:1.55;color:var(--ink2)}
+.mini .q{font:600 12px/1.45 "Songti SC",serif;color:var(--ink);margin-bottom:6px}
+.mini .o{border:1px solid var(--line2);border-radius:5px;padding:3px 6px;margin-bottom:3px;font-size:10px}
+.mini .o.hit{border-color:var(--gold);background:rgba(201,162,39,.11);font-weight:600;color:var(--ink)}
+.mini .o.pick{border-color:var(--seal);color:var(--seal);font-weight:600}
+.mini .t{text-align:center;font:700 22px/1 system-ui;color:var(--seal);margin:2px 0 7px}
+.mini .nm{font:600 11px/1.5 "Songti SC",serif;color:var(--ink)}
+.mini .rk{display:flex;justify-content:space-between;gap:8px;font-size:10px;padding:2.5px 0}
+.mini .rk.top{color:var(--seal);font-weight:600}
+.mini .btn{background:var(--seal);color:#fff;border-radius:5px;text-align:center;
+           font:600 10px/1 system-ui;padding:7px 0;margin-top:5px}
+.mini .qr{width:42px;height:42px;margin:3px auto 5px;
+          background:
+            linear-gradient(var(--ink) 0 0) 0 0/13px 13px no-repeat,
+            linear-gradient(var(--ink) 0 0) 100% 0/13px 13px no-repeat,
+            linear-gradient(var(--ink) 0 0) 0 100%/13px 13px no-repeat;
+          border:1px solid var(--line2);border-radius:3px}
+.mini .ctr{text-align:center}
+
+/* ── 宾客三件事 ─────────────────────────── */
+.three{display:grid;gap:10px;margin:16px 0 0}
+.three div{background:var(--card);border-left:3px solid var(--gold);border-radius:0 10px 10px 0;padding:13px 15px}
+.three b{display:block;margin-bottom:2px}
+.three span{color:var(--ink2);font-size:14.5px}
+
+/* ── 通用段落标题 ───────────────────────── */
+h2{font:600 clamp(21px,5.4vw,25px)/1.4 "Songti SC","Noto Serif CJK SC",serif;
+   margin:52px 0 6px;text-align:center}
+h2+.sub{text-align:center;color:var(--ink3);font-size:14px;margin:0 0 6px}
+.divider{width:54px;height:1.5px;background:var(--gold);margin:14px auto 0;border-radius:2px;opacity:.75}
+
+/* ── 疑问 ───────────────────────────────── */
+.qa{border-top:1px solid var(--line);padding:16px 0 4px}
+.qa:last-of-type{border-bottom:1px solid var(--line)}
+.qa h4{margin:0 0 4px;font:600 16px/1.55 system-ui}
+.qa p{margin:0;color:var(--ink2);font-size:14.5px;line-height:1.78}
+
+.end{text-align:center;margin:56px 0 0;color:var(--ink2)}
+.end .big{font:600 20px/1.6 "Songti SC","Noto Serif CJK SC",serif;color:var(--ink)}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
+       color:var(--ink3);font-size:12.5px;text-align:center;line-height:1.9}
+</style>
+
+<div class=wrap>
+
+<header>
+  <div class=kicker>婚 礼 互 动 环 节</div>
+  <h1>大家掏出手机，<br>一起答十三道题</h1>
+  <p class=lede>不用下载任何东西，不用打字，不用登录。<br>
+     扫一下桌上的二维码就进来了，答得又快又对的人上大屏。</p>
+  <div class=seal>喜</div>
+</header>
+
+<h2>先认识三块屏幕</h2>
+<p class=sub>整件事就是这三块屏幕在配合，看懂它们就看懂了全部</p>
+<div class=divider></div>
+
+<div class=screens>
+  <div class=sc>
+    <div class=who>每 位 宾 客</div>
+    <h4>自己的手机</h4>
+    <p>看到题目和四个选项，用手指点一下就算答完。也能看到自己拿了多少分、排第几。</p>
+  </div>
+  <div class=sc>
+    <div class=who>全 场 一 起 看</div>
+    <h4>宴会厅大屏</h4>
+    <p>放大显示当前这道题、倒计时、每题的正确答案，以及实时排行榜。</p>
+  </div>
+  <div class=sc>
+    <div class=who>只 有 司 仪</div>
+    <h4>主持人的控制台</h4>
+    <p>题目和<b>正确答案</b>都在这里。什么时候出下一题，由司仪按一下决定。</p>
+  </div>
+</div>
+
+<h2>整场是怎么跑起来的</h2>
+<p class=sub>从宾客入座，到最后发奖，一共五站</p>
+<div class=divider></div>
+
+<div class=flow>
+
+  <div class=stop>
+    <div class=n>第 一 站</div>
+    <h3>入座，扫码，领一个名字</h3>
+    <p class=say>每张桌上放着一张二维码卡片。微信扫一下就进来了，
+       系统当场给你起一个名字，比如「描金的折扇」「晶莹的冰棍」。
+       <b>名字是随机发的，不用自己填</b> —— 既省事，也不会有人把真名挂上大屏。</p>
+    <div class=demo>
+      <div class="dev phone"><div class=cap>宾 客 手 机</div><div class="in mini ctr">
+        <div class=qr></div>
+        <div style="font-size:10px;color:var(--ink3)">扫码进入，不用打字</div>
+        <div class=btn>进　入</div>
+      </div></div>
+      <div class="dev tv"><div class=cap>大 屏</div><div class="in mini ctr">
+        <div class=q>婚礼答题</div>
+        <div class=qr></div>
+        <div style="font-size:10px">已入场 <b>128</b> 位</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class=stop>
+    <div class=n>第 二 站</div>
+    <h3>司仪念题，然后按下开始</h3>
+    <p class=say>司仪先把题目和四个选项<b>完整念一遍</b>，念的时候不计时。
+       念完按一下「下一题」，这一瞬间大屏和所有人的手机<b>同时</b>跳出这道题，
+       20 秒倒计时开始走。</p>
+    <div class=demo>
+      <div class="dev phone"><div class=cap>宾 客 手 机</div><div class="in mini">
+        <div class=t>17</div>
+        <div class=q>彩虹通常有几种颜色？</div>
+        <div class=o>A　五种</div><div class=o>B　六种</div>
+        <div class=o>C　七种</div><div class=o>D　八种</div>
+      </div></div>
+      <div class="dev tv"><div class=cap>大 屏</div><div class="in mini">
+        <div class=ctr style="font:700 26px/1 system-ui;color:var(--seal);margin-bottom:6px">17</div>
+        <div class="q ctr">彩虹通常有几种颜色？</div>
+        <div class=o>A　五种</div><div class=o>B　六种</div>
+        <div class=o>C　七种</div><div class=o>D　八种</div>
+        <div class=ctr style="font-size:10px;color:var(--ink3);margin-top:5px">已作答 64 / 128</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class=stop>
+    <div class=n>第 三 站</div>
+    <h3>点一下就算答完</h3>
+    <p class=say>手指点中一个选项，屏幕上会盖一个小印章，表示答案收到了。
+       <b>倒计时结束前还能改</b>，按最后点的那次算。
+       答得越快分越高 —— 第 2 秒点的人，比第 18 秒点的人分高得多。</p>
+    <div class=demo>
+      <div class="dev phone"><div class=cap>点 完 之 后</div><div class="in mini">
+        <div class=t>11</div>
+        <div class=q>彩虹通常有几种颜色？</div>
+        <div class=o>A　五种</div><div class=o>B　六种</div>
+        <div class="o pick">C　七种　✓ 已提交</div><div class=o>D　八种</div>
+        <div style="font-size:9.5px;color:var(--ink3);margin-top:5px;text-align:center">已提交，还能改</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class=stop>
+    <div class=n>第 四 站</div>
+    <h3>时间一到，大屏亮出答案</h3>
+    <p class=say>不用司仪再按什么，倒计时归零就自动揭晓。
+       大屏高亮出正确选项，旁边还标着<b>每个选项有多少人选</b>。
+       这时候司仪会唱分：「这题八十六位作答，只有二十三位答对——」
+       全场最热闹的就是这几秒。</p>
+    <div class=demo>
+      <div class="dev tv"><div class=cap>大 屏 · 公 布 答 案</div><div class="in mini">
+        <div class="q ctr">彩虹通常有几种颜色？</div>
+        <div class=rk><span>A　五种</span><span>3</span></div>
+        <div class=rk><span>B　六种</span><span>11</span></div>
+        <div class="o hit" style="display:flex;justify-content:space-between"><span>C　七种</span><span>86</span></div>
+        <div class=rk><span>D　八种</span><span>5</span></div>
+        <div style="font-size:9.5px;color:var(--ink3);margin:7px 0 3px;text-align:center">当 前 前 五 名</div>
+        <div class="rk top"><span>1　描金的折扇</span><span>2030</span></div>
+        <div class=rk><span>2　晶莹的冰棍</span><span>1960</span></div>
+        <div class=rk><span>3　酥脆的蝴蝶酥</span><span>870</span></div>
+      </div></div>
+    </div>
+    <p class=say style="margin-top:13px">然后司仪再按一次「下一题」，回到第二站。
+       <b>十三道题就这样循环下去</b>，一共大约十五分钟。</p>
+  </div>
+
+  <div class=stop>
+    <div class=n>第 五 站</div>
+    <h3>排名揭晓，领奖的人手机会亮</h3>
+    <p class=say>答完十三题，大屏打出最终排名。
+       发奖时有个小设计：司仪点一下名字，<b>那位宾客的手机会全屏亮起并震动</b>，
+       写着「叫的就是您，请举手」。</p>
+    <p class=say>因为名字是随机发的，光靠念名字容易冷场 ——
+       嘈杂环境里听错，或者本人不敢举手怕认错。手机亮起来，他就确定是自己了。</p>
+    <div class=demo>
+      <div class="dev tv"><div class=cap>大 屏 · 最 终 排 名</div><div class="in mini">
+        <div class="q ctr">最终排名</div>
+        <div class="rk top"><span>1　描金的折扇</span><span>2030</span></div>
+        <div class=rk><span>2　晶莹的冰棍</span><span>1960</span></div>
+        <div class=rk><span>3　酥脆的蝴蝶酥</span><span>870</span></div>
+        <div class=rk><span>4　会响的拨浪鼓</span><span>840</span></div>
+      </div></div>
+      <div class="dev phone"><div class=cap>被 叫 到 的 人</div>
+        <div class=in style="background:var(--seal);color:#fff;text-align:center;padding:22px 10px">
+          <div style="font:600 13px/1.6 'Songti SC',serif">叫的就是您<br>请举手</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>宾客只需要做三件事</h2>
+<p class=sub>不用下载、不用注册、不用打字</p>
+<div class=divider></div>
+
+<div class=three>
+  <div><b>一、扫桌上的二维码</b><span>微信扫一扫，一两秒就进去了。</span></div>
+  <div><b>二、看题，点一个选项</b><span>题目在自己手机上，大屏上也有，看哪边都行。</span></div>
+  <div><b>三、名字被念到时举手</b><span>手机会亮起来提醒你，不会认错。</span></div>
+</div>
+
+<h2>常有人问的几件事</h2>
+<div class=divider></div>
+
+<div class=qa>
+  <h4>要下载 App 吗？</h4>
+  <p>不用。微信扫码直接打开网页，答完就关掉，手机上不留任何东西。</p>
+</div>
+<div class=qa>
+  <h4>长辈不会用怎么办？</h4>
+  <p>全程只有「点一下选项」这一个动作，字也放得很大。同桌的年轻人帮着扫一下码就行。</p>
+</div>
+<div class=qa>
+  <h4>中途走开了、手机没电了呢？</h4>
+  <p>再扫一次码就回到原来的位置，<b>分数不会丢</b>。错过的那几题算没答，不影响后面继续。</p>
+</div>
+<div class=qa>
+  <h4>来晚了还能参加吗？</h4>
+  <p>能。中途任何时候扫码都能进，从下一题开始一起答。</p>
+</div>
+<div class=qa>
+  <h4>万一现场网络出问题呢？</h4>
+  <p>题目在每个人手机上都有，大屏出问题不影响答题。真的整个连不上，
+     司仪手上有纸质题卡，直接改成「念题、举手抢答」，场子照样热。</p>
+</div>
+<div class=qa>
+  <h4>题目是关于什么的？</h4>
+  <p>关于新郎新娘 —— 怎么认识的、第一次约会去了哪、谁先说的喜欢。
+     答题的过程，其实就是大家一起把他们的故事听一遍。</p>
+</div>
+
+<div class=end>
+  <p class=big>说到底，这不是一场比赛。</p>
+  <p>它只是让三百个人，<br>在同一分钟里，一起想起同一对新人。</p>
+</div>
+
+<footer>
+  婚礼答题 · 2026 年 10 月 6 日<br>
+  这一页可以直接转发给任何人看
+</footer>
+
+</div>
+</html>

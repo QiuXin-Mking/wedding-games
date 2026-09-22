@@ -29,6 +29,10 @@ const ROUTES = {
   '/index.html': 'index.html',
   '/screen': 'screen.html',
   '/host': 'host.html',
+  // 主持人手册。不带口令、不含技术细节，把链接直接发给主持人即可。
+  '/guide': 'guide.html',
+  // 给非技术人员看的流程说明。可以直接转发给新人、长辈、婚礼策划。
+  '/how': 'how.html',
 };
 
 const MIME = {
