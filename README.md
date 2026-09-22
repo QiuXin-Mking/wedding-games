@@ -10,8 +10,22 @@
 | 端 | 地址 |
 |----|------|
 | 宾客 | `http://119.29.186.63:8888/` |
-| 大屏 | `http://119.29.186.63:8888/screen?key=screen2026` |
-| 主持人 | `http://119.29.186.63:8888/host?key=host2026` |
+| 大屏 | `http://119.29.186.63:8888/screen?key=<口令>` |
+| 主持人 | `http://119.29.186.63:8888/host?key=<口令>` |
+
+> **口令绝不写进仓库。** 本仓库是 public，而这两个口令一旦泄漏，
+> 任何人都能打开主持人控制台点「跳过本题」「公布最终排名」——
+> 足以当场毁掉整场游戏。
+>
+> 口令只存在于服务器的 systemd 配置里，用这条命令查：
+>
+> ```bash
+> ssh root@119.29.186.63 "grep -E 'SCREEN_KEY|HOST_KEY' /etc/systemd/system/wedding-quiz.service"
+> ```
+>
+> 换口令：改上面那个文件里的两行，然后
+> `systemctl daemon-reload && systemctl restart wedding-quiz`。
+> 换完当场通知大屏值守和主持人，旧链接会立刻失效。
 
 ---
 

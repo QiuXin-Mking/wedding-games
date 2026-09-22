@@ -67,6 +67,8 @@ case "${1:-deploy}" in
       tar xzf /tmp/wq-deploy.tgz -C $ROOT/releases/\$S
       cd $ROOT/releases/\$S && npm install --omit=dev --silent
       ln -sfn $ROOT/releases/\$S $ROOT/current
+      # 重置脚本装到固定路径，不随版本漂移 —— 当天要用的东西，路径必须是死的
+      install -m 755 $ROOT/releases/\$S/tools/reset-game.sh $ROOT/reset.sh
       chown -R wedding:wedding $ROOT
       systemctl restart wedding-quiz
       sleep 2
