@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Game, EV, CLOSE_REASON } from '../src/game.js';
 import { QuizBank } from '../src/quizbank.js';
 import { NicknamePool } from '../src/nicknames.js';
-import { C2S, STAGE, OUTCOME, REJECT, RULES } from '../src/protocol.js';
+import { C2S, STAGE, OUTCOME, REJECT, RULES, awardOf, awardTotal } from '../src/protocol.js';
 
 const T0 = 1_000_000;
 
@@ -513,5 +513,42 @@ describe('唱分的数字必须说真话', () => {
     g.hostAction(C2S.HOST_EARLY_SETTLE, { expectedQIndex: 0 }, T0 + 3000);
     assert.equal(g.answeredCount(), 0, '没人点，就得是 0');
     assert.equal(g.distribution().reduce((a, b) => a + b, 0), 0);
+  });
+});
+
+describe('颁奖分档', () => {
+  test('1 个一等、2 个二等、3 个三等，第 7 名起无奖', () => {
+    assert.equal(awardOf(1), '一等奖');
+    assert.equal(awardOf(2), '二等奖');
+    assert.equal(awardOf(3), '二等奖');
+    assert.equal(awardOf(4), '三等奖');
+    assert.equal(awardOf(5), '三等奖');
+    assert.equal(awardOf(6), '三等奖');
+    assert.equal(awardOf(7), null, '第 7 名开始没有奖');
+    assert.equal(awardTotal(), 6);
+  });
+
+  test('非法名次不给奖', () => {
+    assert.equal(awardOf(0), null);
+    assert.equal(awardOf(-1), null);
+    assert.equal(awardOf(1.5), null);
+    assert.equal(awardOf(undefined), null);
+  });
+
+  test('榜单必须比奖项长 —— 只亮 6 个名字颁奖会冷场', () => {
+    assert.ok(RULES.FINAL_BOARD_SIZE > awardTotal(),
+      `大屏榜单 ${RULES.FINAL_BOARD_SIZE} 名，有奖 ${awardTotal()} 人；`
+      + '榜单不比奖项长的话，主持人念完就没得念了，场子会一下子空下来');
+  });
+
+  test('名次唯一，不会出现两个人并列争同一个奖', () => {
+    // 三级排序（总分 → 答对题累计耗时 → 入场序号）保证名次唯一，
+    // 否则「第 2、3 名都是二等奖」这种按累计人数切档的做法就会出错。
+    const { g, ids } = started(4);
+    ids.forEach((id) => g.answer(id, 0, CORRECT, T0 + 5000));   // 同时同分
+    g.hostAction(C2S.HOST_EARLY_SETTLE, { expectedQIndex: 0 }, T0 + 6000);
+    const ranks = g.leaderboard().map((r) => r.rank);
+    assert.deepEqual(ranks, [1, 2, 3, 4], '同分也必须分出先后');
+    assert.equal(new Set(ranks).size, ranks.length);
   });
 });

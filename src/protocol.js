@@ -160,6 +160,23 @@ export const RULES = Object.freeze({
   MAIN_QUESTIONS: 13,
   /** 备用题数量下限 */
   MIN_SPARE_QUESTIONS: 1,
+  /**
+   * 奖项分档。按名次从上往下发，加起来就是有奖的人数。
+   * 改这里等于改颁奖规则，大屏、主持人端会一起变。
+   */
+  AWARDS: Object.freeze([
+    Object.freeze({ name: '一等奖', count: 1 }),
+    Object.freeze({ name: '二等奖', count: 2 }),
+    Object.freeze({ name: '三等奖', count: 3 }),
+  ]),
+  /**
+   * 大屏最终榜单展示多少名。
+   *
+   * **故意多于有奖人数**：只亮 6 个名字颁奖会很快结束，场子一下子空下来。
+   * 多亮 3 个，主持人能多念几个名字、多要几轮掌声，第 7~9 名虽然没奖，
+   * 上榜本身也是个交代。
+   */
+  FINAL_BOARD_SIZE: 9,
   /** 昵称池容量 */
   NICKNAME_POOL_SIZE: 400,
 });
@@ -179,4 +196,27 @@ export function scoreOf(correct, remainMs) {
   if (!correct) return 0;
   if (remainMs <= 0) return 0;
   return RULES.BASE_SCORE + Math.floor(remainMs / 1000) * RULES.SPEED_BONUS_PER_SEC;
+}
+
+
+/**
+ * 这个名次拿什么奖；没奖返回 null。
+ *
+ * 名次由 leaderboard 的三级排序保证唯一，不会并列，
+ * 所以「第 2、3 名都是二等奖」这种分档可以直接按累计人数切。
+ * @param {number} rank 从 1 开始
+ */
+export function awardOf(rank) {
+  if (!Number.isInteger(rank) || rank < 1) return null;
+  let upto = 0;
+  for (const a of RULES.AWARDS) {
+    upto += a.count;
+    if (rank <= upto) return a.name;
+  }
+  return null;
+}
+
+/** 一共几个人有奖 */
+export function awardTotal() {
+  return RULES.AWARDS.reduce((n, a) => n + a.count, 0);
 }

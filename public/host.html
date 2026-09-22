@@ -78,6 +78,9 @@ details[open] summary::after{content:'▴'}
 
 /* ── 宾客管理 ─────────────────────── */
 #find{width:100%;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:rgba(42,28,22,.035);color:inherit;font:15px inherit}
+.who i{flex:none;font-style:normal;font:600 11px/1 system-ui;letter-spacing:.04em;
+  padding:4px 6px;border-radius:5px;background:var(--gold);color:#fff}
+.who i.first{background:var(--seal)}
 .who s{flex:none;width:1.9em;text-decoration:none;text-align:right;color:var(--ink3);
   font:600 14px/1 system-ui;font-variant-numeric:tabular-nums}
 .who s.top{color:var(--seal)}
@@ -278,7 +281,7 @@ function renderGuests(){
   const kw=$('#find').value.trim();
   const hit=guests.filter(g=>!kw||g.nickname.includes(kw));
   const rows=hit.slice(0,8);
-  $('#list').innerHTML=rows.map(g=>'<div class=who><s'+(g.rank<=3?' class=top':'')+'>'+(g.rank??'')+'</s><u>'+esc(g.nickname)+'</u>'+
+  $('#list').innerHTML=rows.map(g=>'<div class=who><s'+(g.rank<=3?' class=top':'')+'>'+(g.rank??'')+'</s><u>'+esc(g.nickname)+'</u>'+(g.award?'<i'+(g.rank===1?' class=first':'')+'>'+esc(g.award)+'</i>':'')+
     '<span class=num>'+g.total+'</span>'+
     // 发奖点名：让这位宾客的手机全屏亮起「叫的就是您」。
     // 随机昵称和真人之间没有联系，光靠念名字 + 举手认领并不可靠。

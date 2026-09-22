@@ -31,6 +31,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
   background:var(--seal);color:#fff;cursor:pointer;letter-spacing:.1em}
 #qr{width:26vh;height:26vh;border:.5vh solid #fff;box-shadow:0 0 0 1px var(--line);background:#fff}
 .url{font:600 1.5vw/1 system-ui;letter-spacing:.02em;color:var(--ink2)}
+/* 待机页的奖项栏。宾客扫码前就该知道有奖可拿 —— 不然只是「陪着点几下」，
+   没人会认真抢答，场子也热不起来。 */
+.prizes{display:flex;gap:1.6vw;justify-content:center;margin-top:.4vh}
+.prize{display:grid;justify-items:center;gap:.5vh;padding:1.3vh 2vw;
+  border:1px solid var(--line);border-radius:.7vw;background:rgba(201,162,39,.07)}
+.prize b{font:600 2.1vw/1 "Songti SC","Noto Serif CJK SC",serif;color:var(--ink)}
+.prize span{font-size:1.05vw;color:var(--ink2);font-variant-numeric:tabular-nums}
+.prize:first-child{border-color:rgba(200,54,47,.45);background:rgba(200,54,47,.07)}
+.prize:first-child b{color:var(--seal)}
 .count{font:600 3.4vw/1 system-ui;font-variant-numeric:tabular-nums}
 
 /* ── 答题：倒计时是全场的节奏，这里它必须最大 ── */
@@ -51,6 +60,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 .answered b{font-weight:600;font-variant-numeric:tabular-nums}
 
 /* ── 排行 ───────────────────────────── */
+/* 终局要放 9 行 + 标题，1080 高度下按结算态的尺度会溢出（标题会被顶掉）。
+   给终局单独收紧行高与字号；结算态只有前五名，维持原样。 */
+.final .board{gap:.55vh;width:58vw}
+.final .row{padding:.75vh 1.4vw;font-size:1.85vw}
+.final .title{font-size:3.6vw}
+.final .rule{margin-bottom:.4vh}
 .board{display:grid;gap:.9vh;width:62vw}
 .row{display:flex;align-items:center;gap:1.6vw;padding:1.1vh 1.6vw;border-radius:.6vw;font-size:2.2vw}
 .row.t1{background:rgba(200,54,47,.09)}
@@ -59,6 +74,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 .row.t1 s{color:var(--seal)}
 .row u{flex:1;text-decoration:none;font-family:"Songti SC","Noto Serif CJK SC",serif;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row em{font-style:normal;font-variant-numeric:tabular-nums;font-weight:600}
+/* 奖项标签。颁奖时全场要一眼看出哪几位有奖，所以给有奖的行一个实心标签，
+   并在最后一个奖项和第一个无奖名次之间画一道分界线。 */
+.row .aw{flex:none;font:600 1.15vw/1 system-ui;letter-spacing:.06em;padding:.5vh .8vw;
+  border-radius:.4vw;background:var(--gold);color:#fff;margin-left:.8vw}
+.row.t1 .aw{background:var(--seal)}
+.row.cut{margin-top:1.4vh;padding-top:1.9vh;border-top:1px dashed rgba(61,43,35,.28);position:relative}
+.row.cut::before{content:"以下为上榜鼓励";position:absolute;top:-.95vh;left:50%;
+  transform:translateX(-50%);background:var(--paper);padding:0 1vw;
+  font:500 .95vw/1 system-ui;color:var(--ink3);letter-spacing:.14em}
 .void{font:600 3.2vw/1.3 "Songti SC","Noto Serif CJK SC",serif;color:var(--ink2)}
 #qrmini{position:fixed;right:1.4vw;bottom:1.4vw;display:none;text-align:center;font-size:.9vw;color:var(--ink2)}
 #qrmini.on{display:block}
@@ -136,7 +160,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 </div>
 <div id=qrbig><img src=/qr.png alt="扫码进入" onerror=qrFail(this)><div>没进来的现在扫</div></div>
 <script type=module>
-import {C2S,S2C,STAGE,ROLE} from '/src/protocol.js';
+import {C2S,S2C,STAGE,ROLE,RULES} from '/src/protocol.js';
 const $=s=>document.querySelector(s);
 const stage=$('#stage'),conn=$('#conn');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -226,14 +250,18 @@ function render(){
 }
 
 function paintIdle(){
+  stage.classList.remove('final');
   cancelAnimationFrame(raf);
+  const prizes=RULES.AWARDS.map(a=>'<div class=prize><b>'+a.name+'</b><span>'+a.count+' 位</span></div>').join('');
   stage.innerHTML='<div class="title serif">婚礼答题</div><div class=rule></div>'+
     '<img id=qr src=/qr.png alt="扫码进入" onerror=qrFail(this)>'+
     '<div class=url>扫码进入，不用打字</div>'+
+    '<div class=prizes>'+prizes+'</div>'+
     '<div class=count>已入场 '+S.joined+' 位</div>';
 }
 
 function paintAsk(){
+  stage.classList.remove('final');
   const q=S.q;if(!q)return paintIdle();
   stage.innerHTML='<div class=qno>第 '+(q.qIndex+1)+' 题 / '+q.total+'</div>'+
     '<div id=big class=num>'+'</div>'+
@@ -253,6 +281,7 @@ function patchProgress(){
 }
 
 function paintReveal(){
+  stage.classList.remove('final');
   cancelAnimationFrame(raf);
   const r=S.reveal,q=S.q;
   if(r?.voided){
@@ -276,9 +305,17 @@ function board(rows,title){
 
 function paintFinal(){
   cancelAnimationFrame(raf);
+  const list=S.final||[];
+  // 最后一个有奖的名次之后画分界 —— 让全场看清奖发到哪儿为止
+  let lastAward=0;
+  list.forEach(r=>{if(r.award)lastAward=r.rank});
+  stage.classList.add('final');
   stage.innerHTML='<div class="title serif">最终排名</div><div class=rule></div>'+
-    '<div class=board>'+(S.final||[]).map(r=>
-      '<div class="row t'+r.rank+'"><s>'+r.rank+'</s><u>'+esc(r.nickname)+'</u><em>'+r.total+'</em></div>').join('')+'</div>';
+    '<div class=board>'+list.map(r=>
+      '<div class="row t'+r.rank+(r.rank===lastAward+1?' cut':'')+'">'+
+      '<s>'+r.rank+'</s><u>'+esc(r.nickname)+'</u><em>'+r.total+'</em>'+
+      (r.award?'<span class=aw>'+esc(r.award)+'</span>':'')+
+      '</div>').join('')+'</div>';
 }
 
 paintIdle();connect();

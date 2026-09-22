@@ -17,7 +17,7 @@ import { loadBank, saveBankChoice } from './quizbank.js';
 import { now } from './clock.js';
 import { renameSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { C2S, S2C, ROLE, STAGE, REJECT, NOTICE } from './protocol.js';
+import { C2S, S2C, ROLE, STAGE, REJECT, NOTICE, RULES, awardOf } from './protocol.js';
 
 export class Hub {
   /**
@@ -238,7 +238,7 @@ export class Hub {
         // 这样这里的名次和大屏上打出来的完全一致，不会出现「大屏说他第一、
         // 控制台里却排在第七」这种当众对不上的情况。
         guests: this.game.leaderboard().map(({ clientId, nickname, total, rank }) => ({
-          clientId, nickname, total, rank,
+          clientId, nickname, total, rank, award: awardOf(rank),
         })),
       });
       return { ok: true, events: [] };
@@ -323,11 +323,18 @@ export class Hub {
     }
   }
 
+  /** 终局榜单的唯一来源。长度与奖项都由 RULES 决定 */
+  finalBoard() {
+    return this.game.leaderboard().slice(0, RULES.FINAL_BOARD_SIZE)
+      .map(({ nickname, total, rank }) => ({ nickname, total, rank, award: awardOf(rank) }));
+  }
+
   #pushFinal() {
     const board = this.game.leaderboard();
     this.broadcast({
       type: S2C.FINAL,
-      top10: board.slice(0, 10).map(({ nickname, total, rank }) => ({ nickname, total, rank })),
+      // 字段名保留 top10 不动，免得改坏三端
+      top10: this.finalBoard(),
     });
     for (const [ws, meta] of this.conns) {
       if (meta.role !== ROLE.GUEST || !meta.clientId) continue;
@@ -429,8 +436,10 @@ export class Hub {
       if (clientId) base.myResult = g.myResultPayload(clientId);
     }
     if (g.stage === STAGE.FINAL) {
-      base.final = g.leaderboard().slice(0, 10)
-        .map(({ nickname, total, rank }) => ({ nickname, total, rank }));
+      // 必须和 #pushFinal 给出的完全一致 —— 同一份榜单有两条下发路径
+      // （终局广播 / 刷新后的快照重建），口径分叉的话，刷新过的大屏就会
+      // 少掉奖项标签。这个位置之前已经栽过一次：漏读 final 导致榜单整个空白。
+      base.final = this.finalBoard();
     }
     if (clientId && g.guests.has(clientId)) {
       const guest = g.guests.get(clientId);

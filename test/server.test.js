@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import WebSocket from 'ws';
 
 import { createApp } from '../server.js';
-import { C2S, S2C, ROLE, REJECT, STAGE, RULES } from '../src/protocol.js';
+import { C2S, S2C, ROLE, REJECT, STAGE, RULES, awardTotal } from '../src/protocol.js';
 
 const SCREEN_KEY = 'scr-key';
 const HOST_KEY = 'host-key';
@@ -557,68 +557,116 @@ describe('后台运维页', () => {
   });
 });
 
+
+/** 起一个独立实例 + 一组便于收发的连接。测完统一关，否则进程退不出 */
+async function makeRig(opts = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'rig-'));
+  const app = createApp({ dataDir: dir, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30, ...opts });
+  const port = await app.listen(0);
+  const opened = [];
+  const mk = async (hello) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const q = [];
+    ws.on('message', (r) => q.push(JSON.parse(r.toString())));
+    await new Promise((r) => ws.on('open', r));
+    ws.send(JSON.stringify(hello));
+    const c = { ws, q, send: (o) => ws.send(JSON.stringify(o)) };
+    opened.push(c);
+    return c;
+  };
+  const wait = (q, pred, ms = 3000) => new Promise((res, rej) => {
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      const hit = [...q].reverse().find(pred);
+      if (hit) { clearInterval(iv); res(hit); }
+      else if (Date.now() - t0 > ms) { clearInterval(iv); rej(new Error('等超时')); }
+    }, 20);
+  });
+  const done = async () => {
+    for (const c of opened) c.ws.close();
+    await app.close();
+  };
+  return { mk, wait, done };
+}
+
 describe('宾客管理按名次排', () => {
   // 发奖时主持人要找的是第一名，不是最早扫码的那个人。
   // 原先按入场顺序排、前端又只显示 8 条，等于「最早进来的 8 个人」——
   // 想点第一名只能靠搜昵称，而那一刻全场都在等他念名字。
   test('列表按名次降序，且名次与大屏排行榜一致', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'gsort-'));
-    const app = createApp({ dataDir: dir, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
-    const port = await app.listen(0);
-    const mk = async (hello) => {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}`);
-      const q = [];
-      ws.on('message', (r) => q.push(JSON.parse(r.toString())));
-      await new Promise((r) => ws.on('open', r));
-      ws.send(JSON.stringify(hello));
-      return { ws, q, send: (o) => ws.send(JSON.stringify(o)) };
-    };
-    const wait = (q, pred, ms = 3000) => new Promise((res, rej) => {
-      const t0 = Date.now();
-      const iv = setInterval(() => {
-        const hit = [...q].reverse().find(pred);
-        if (hit) { clearInterval(iv); res(hit); }
-        else if (Date.now() - t0 > ms) { clearInterval(iv); rej(new Error('等超时')); }
-      }, 20);
-    });
+    const { mk, wait, done } = await makeRig();
+    try {
+      const host = await mk({ type: C2S.HELLO, role: ROLE.HOST, key: HOST_KEY });
+      await wait(host.q, (m) => m.type === S2C.SNAPSHOT);
 
-    const host = await mk({ type: C2S.HELLO, role: ROLE.HOST, key: HOST_KEY });
-    await wait(host.q, (m) => m.type === S2C.SNAPSHOT);
+      // 入场顺序 a→b→c，但让最后入场的 c 拿最高分
+      const gs = [];
+      for (const id of ['a', 'b', 'c']) {
+        const g = await mk({ type: C2S.HELLO, role: ROLE.GUEST });
+        await wait(g.q, (m) => m.type === S2C.SNAPSHOT);
+        g.send({ type: C2S.JOIN, clientId: id });
+        await wait(g.q, (m) => m.type === S2C.IDENTITY);
+        gs.push(g);
+      }
+      host.send({ type: C2S.HOST_START, expectedQIndex: -1 });
+      await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.READY);
+      host.send({ type: C2S.HOST_NEXT, expectedQIndex: -1 });
+      const q0 = await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.ASKING);
 
-    // 三位宾客按入场顺序 a→b→c，但让最后入场的 c 拿最高分
-    const gs = [];
-    for (const id of ['a', 'b', 'c']) {
-      const g = await mk({ type: C2S.HELLO, role: ROLE.GUEST });
-      await wait(g.q, (m) => m.type === S2C.SNAPSHOT);
-      g.send({ type: C2S.JOIN, clientId: id });
-      await wait(g.q, (m) => m.type === S2C.IDENTITY);
-      gs.push(g);
-    }
-    host.send({ type: C2S.HOST_START, expectedQIndex: -1 });
-    await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.READY);
-    host.send({ type: C2S.HOST_NEXT, expectedQIndex: -1 });
-    const q0 = await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.ASKING);
+      gs[2].send({ type: C2S.ANSWER, qIndex: 0, optionIndex: q0.correctIndex });
+      await wait(gs[2].q, (m) => m.type === S2C.ANSWER_ACK);
+      host.send({ type: C2S.HOST_EARLY_SETTLE, expectedQIndex: 0 });
+      await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.REVEAL);
 
-    // 只有 c 答对
-    gs[2].send({ type: C2S.ANSWER, qIndex: 0, optionIndex: q0.correctIndex });
-    await wait(gs[2].q, (m) => m.type === S2C.ANSWER_ACK);
-    host.send({ type: C2S.HOST_EARLY_SETTLE, expectedQIndex: 0 });
-    await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.REVEAL);
+      host.q.length = 0;
+      host.send({ type: C2S.HOST_GUESTS, expectedQIndex: 0 });
+      const list = await wait(host.q, (m) => m.type === S2C.GUEST_LIST);
 
-    host.q.length = 0;
-    host.send({ type: C2S.HOST_GUESTS, expectedQIndex: 0 });
-    const list = await wait(host.q, (m) => m.type === S2C.GUEST_LIST);
+      assert.equal(list.guests.length, 3);
+      assert.equal(list.guests[0].clientId, 'c',
+        '最后入场但分最高的人必须排第一，否则发奖时点不到他');
+      assert.equal(list.guests[0].rank, 1, '必须带名次，主持人要靠它确认点的是第一名');
+      const totals = list.guests.map((g) => g.total);
+      assert.deepEqual([...totals].sort((x, y) => y - x), totals, '必须按分数降序');
+      assert.deepEqual(list.guests.map((g) => g.rank), [1, 2, 3], '名次要连续且从 1 开始');
+      assert.equal(list.guests[0].award, '一等奖', '颁奖时主持人要照着这里念');
+    } finally { await done(); }
+  });
+});
 
-    assert.equal(list.guests.length, 3);
-    assert.equal(list.guests[0].clientId, 'c',
-      '最后入场但分最高的人必须排第一，否则发奖时点不到他');
-    assert.equal(list.guests[0].rank, 1, '必须带名次，主持人要靠它确认点的是第一名');
-    const totals = list.guests.map((g) => g.total);
-    assert.deepEqual([...totals].sort((x, y) => y - x), totals, '必须按分数降序');
-    assert.deepEqual(list.guests.map((g) => g.rank), [1, 2, 3], '名次要连续且从 1 开始');
+describe('终局榜单：两条下发路径必须一致', () => {
+  // 同一份榜单有两条路：host:finish 时的广播、以及刷新后的快照重建。
+  // 这个位置栽过两次 —— 先是快照漏带 final 导致刷新后榜单空白，
+  // 后是快照漏带 award 导致刷新过的大屏没有奖项标签、分隔线还跑错了位置。
+  test('广播的 top10 与快照里的 final 完全相同（含奖项）', async () => {
+    const { mk, wait, done } = await makeRig();
+    try {
+      const host = await mk({ type: C2S.HELLO, role: ROLE.HOST, key: HOST_KEY });
+      await wait(host.q, (m) => m.type === S2C.SNAPSHOT);
 
-    for (const g of gs) g.ws.close();
-    host.ws.close();
-    await app.close();
+      // 人数要多于榜单长度，才验得出「只取前 N 名」
+      for (let i = 0; i < RULES.FINAL_BOARD_SIZE + 2; i++) {
+        const g = await mk({ type: C2S.HELLO, role: ROLE.GUEST });
+        await wait(g.q, (m) => m.type === S2C.SNAPSHOT);
+        g.send({ type: C2S.JOIN, clientId: 'p' + i });
+        await wait(g.q, (m) => m.type === S2C.IDENTITY);
+      }
+      host.send({ type: C2S.HOST_START, expectedQIndex: -1 });
+      await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.READY);
+      host.send({ type: C2S.HOST_FINISH, expectedQIndex: -1 });
+      const bcast = await wait(host.q, (m) => m.type === S2C.FINAL);
+
+      // 再开一块大屏，等同于「刷新后重新进来」
+      const screen = await mk({ type: C2S.HELLO, role: ROLE.SCREEN });
+      const snap = await wait(screen.q, (m) => m.type === S2C.SNAPSHOT);
+
+      assert.deepEqual(snap.final, bcast.top10,
+        '刷新后拿到的榜单必须和终局广播的一模一样');
+      assert.equal(bcast.top10.length, RULES.FINAL_BOARD_SIZE,
+        `榜单应有 ${RULES.FINAL_BOARD_SIZE} 名`);
+      assert.equal(bcast.top10[0].award, '一等奖');
+      assert.equal(bcast.top10[awardTotal() - 1].award, '三等奖', '最后一个有奖的是三等奖');
+      assert.equal(bcast.top10[awardTotal()].award, null, '之后的名次没有奖，但仍然上榜');
+    } finally { await done(); }
   });
 });
