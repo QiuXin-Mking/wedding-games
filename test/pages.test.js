@@ -56,7 +56,8 @@ describe('口令不对时不能是死胡同', () => {
   // 真实场景：婚礼当天守大屏的亲戚手上那份链接是旧的，页面只说「口令不对，
   // 请检查链接里的 key」——他既不知道 key 是什么，也拿不到正确的链接。
   // 所以两端都必须能就地补口令。
-  for (const name of ['screen', 'host']) {
+  // 大屏已取消口令，只剩主持人端需要这条兜底
+  for (const name of ['host']) {
     test(`${name}.html 被拒后能就地输入口令`, () => {
       const src = readFileSync(new URL(`../public/${name}.html`, import.meta.url), 'utf8');
       assert.match(src, /function askKey\(/, '缺少补录口令的入口');
@@ -66,9 +67,9 @@ describe('口令不对时不能是死胡同', () => {
     });
   }
 
-  test('大屏的口令框是 password —— 那块屏可能正投给全场', () => {
+  test('大屏不该再有口令框 —— 它已经是免口令的展示端', () => {
     const src = readFileSync(new URL('../public/screen.html', import.meta.url), 'utf8');
-    assert.match(src, /inp\.type\s*=\s*['"]password['"]/, '大屏口令明文显示会被全场看到甚至拍照');
+    assert.equal(/askKey|keybox/.test(src), false, '大屏残留着口令输入逻辑，是死代码');
   });
 });
 

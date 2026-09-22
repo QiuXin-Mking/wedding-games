@@ -114,7 +114,7 @@ function serveStatic(req, res) {
  * @param {{port?: number, dataDir?: string, screenKey?: string, hostKey?: string, tickMs?: number}} [opts]
  */
 export function createApp(opts = {}) {
-  const screenKey = opts.screenKey ?? process.env.SCREEN_KEY ?? 'screen';
+  // screenKey 已废弃：大屏不设口令。保留入参只为不破坏既有调用
   const hostKey = opts.hostKey ?? process.env.HOST_KEY ?? 'host';
   const adminKey = opts.adminKey ?? process.env.ADMIN_KEY ?? 'admin';
   const dataDir = opts.dataDir ?? DATA_DIR;
@@ -165,7 +165,7 @@ export function createApp(opts = {}) {
       } catch {
         return; // 垃圾数据直接丢，不回应、不断开
       }
-      handleMessage(hub, ws, msg, { screenKey, hostKey, adminKey });
+      handleMessage(hub, ws, msg, { hostKey, adminKey });
     });
     ws.on('close', () => hub.detach(ws));
     ws.on('error', () => hub.detach(ws));
@@ -202,9 +202,9 @@ function handleMessage(hub, ws, msg, keys) {
   // hello 必须是第一条
   if (msg.type === C2S.HELLO) {
     const role = msg.role;
-    if (role === ROLE.SCREEN && msg.key !== keys.screenKey) {
-      return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
-    }
+    // 大屏不设口令：它是纯展示端，没有任何控制能力，宾客提前打开也拿不到优势
+    // （答案只在结算时公布，和手机同步）。而口令是当天真实出过问题的一环 ——
+    // 值守的人拿到的链接一旦是旧的就打不开，多一道口令只是多一个会坏的地方。
     if (role === ROLE.HOST && msg.key !== keys.hostKey) {
       return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
     }

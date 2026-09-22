@@ -79,10 +79,18 @@ function logEvents() {
 }
 
 describe('AC-11 口令校验', () => {
-  test('大屏口令错误被拒', async () => {
+  test('大屏不需要口令 —— 纯展示端，少一道会坏的环节', async () => {
     const c = await connect();
-    c.send({ type: C2S.HELLO, role: ROLE.SCREEN, key: '猜的' });
-    assert.equal((await c.next(S2C.REJECTED)).reason, REJECT.BAD_KEY);
+    c.send({ type: C2S.HELLO, role: ROLE.SCREEN });
+    const snap = await c.next(S2C.SNAPSHOT);
+    assert.equal(snap.type, S2C.SNAPSHOT, '大屏应当无口令直接进入');
+    c.close();
+  });
+
+  test('大屏带个乱口令也照样进 —— 服务端根本不看它', async () => {
+    const c = await connect();
+    c.send({ type: C2S.HELLO, role: ROLE.SCREEN, key: '随便乱打的' });
+    assert.equal((await c.next(S2C.SNAPSHOT)).type, S2C.SNAPSHOT);
     c.close();
   });
 
