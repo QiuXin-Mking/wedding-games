@@ -124,6 +124,8 @@ export const REJECT = Object.freeze({
   STALE_ACTION: 'staleAction',
   ILLEGAL_TRANSITION: 'illegalTransition',
   UNKNOWN_GUEST: 'unknownGuest',
+  /** join 缺 clientId 或角色不对。必须回执 —— 宾客端的「进入」按钮在等它解锁 */
+  BAD_JOIN: 'badJoin',
 });
 
 /** notice 的种类，决定宾客端展示什么文案 */

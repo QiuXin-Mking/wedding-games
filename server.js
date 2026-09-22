@@ -218,7 +218,11 @@ function handleMessage(hub, ws, msg, keys) {
   }
 
   if (msg.type === C2S.JOIN) {
-    if (meta.role !== ROLE.GUEST || !msg.clientId) return;
+    // 不回话比拒绝更糟：宾客端点完「进入」按钮就变灰，等的正是这条回执。
+    // 静默 return 会让那台手机永远卡在灰按钮上，连「失败了」都不知道。
+    if (meta.role !== ROLE.GUEST || !msg.clientId) {
+      return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_JOIN });
+    }
     return void hub.handleJoin(ws, msg.clientId);
   }
 

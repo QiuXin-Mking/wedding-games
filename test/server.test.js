@@ -391,3 +391,26 @@ describe('发奖点名（Q-N1 / 演练 X-3）', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('入场失败必须有回执', () => {
+  // 宾客端点完「进入」按钮立刻变灰，等的就是这条回执。
+  // 服务端原先在 join 缺 clientId 时直接 return，那台手机会永远卡在灰按钮上，
+  // 连「失败了」都不知道 —— 不回话比拒绝更糟。
+  test('join 缺 clientId 时回 badJoin，而不是静默丢弃', async () => {
+    const c = await connect();
+    await hello(c, ROLE.GUEST, undefined, 'g-noid');
+    c.send({ type: C2S.JOIN });
+    const r = await c.next(S2C.REJECTED);
+    assert.equal(r.reason, REJECT.BAD_JOIN);
+    c.close();
+  });
+
+  test('非宾客角色发 join 也有回执', async () => {
+    const c = await connect();
+    c.send({ type: C2S.HELLO, role: ROLE.HOST, key: HOST_KEY });
+    await c.next(S2C.SNAPSHOT);
+    c.send({ type: C2S.JOIN, clientId: 'x' });
+    assert.equal((await c.next(S2C.REJECTED)).reason, REJECT.BAD_JOIN);
+    c.close();
+  });
+});

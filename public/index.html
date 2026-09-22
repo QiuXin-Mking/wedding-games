@@ -206,7 +206,7 @@ function handle(m){
       S.paused=(m.stage==='PAUSED');
       return render();
     }
-    case S2C.IDENTITY:S.me={clientId:m.clientId,nickname:m.nickname,total:0,correctCount:0};S.stage='REVEALING';return render();
+    case S2C.IDENTITY:releaseJoin();S.me={clientId:m.clientId,nickname:m.nickname,total:0,correctCount:0};S.stage='REVEALING';return render();
     case S2C.QUESTION:
       S.q=m;S.my=null;S.reveal=null;S.stage=STAGE.ASKING;
       // extend 会重播 question。载荷带着 mySubmitted/myOption，
@@ -231,6 +231,8 @@ function handle(m){
       const why=m.reason==='gameFinished'?'本轮已经结束了，谢谢参与'
         :m.reason==='paused'?'暂停中，稍等片刻'
         :'这一下没生效，再试一次';
+      // 文案说「再试一次」，就必须让他点得动 —— 否则是在骗人
+      releaseJoin();
       if(m.reason==='gameFinished'){S.over=true;render()}else flash(why);
       return;
     }
@@ -247,6 +249,21 @@ function showCalled(name){
 }
 let noticeT=0;
 function flash(t){notice.textContent=t;notice.hidden=false;clearTimeout(noticeT);noticeT=setTimeout(()=>{notice.hidden=true},7000)}
+
+/* 「进入」按钮的救生索。点下即变灰等 identity，而失败路径不止一条（被拒、
+   消息丢了、服务端没回），任何一条都会让按钮永远灰着。不猜原因，8 秒兜底。 */
+let joinT=0;
+function armJoinTimeout(){
+  clearTimeout(joinT);
+  joinT=setTimeout(()=>releaseJoin('没连上，再点一次试试'),8000);
+}
+function releaseJoin(why){
+  clearTimeout(joinT);joinT=0;
+  const go=$('#go');
+  if(!go||!go.disabled)return;
+  go.disabled=false;
+  if(why)flash(why);
+}
 
 /* ── 渲染：收到消息整体重画，不做增量对账 ───────────────────── */
 function render(){
@@ -267,7 +284,7 @@ function render(){
       // AC-51：这两件事必须在入场页就说，不能等进去之后才告诉人
       '<div class=sub style="font-size:14px;line-height:1.9">共 13 题，每题 20 秒<br>'+
       '<b>答得越快，分越高</b><br>中途退出没关系，再扫一次桌上的码就回来，分不会丢</div></div>';
-    $('#go').onclick=e=>{e.target.disabled=true;send({type:C2S.JOIN,clientId:cid})};
+    $('#go').onclick=e=>{e.target.disabled=true;send({type:C2S.JOIN,clientId:cid});armJoinTimeout()};
     stopTick();hint.textContent='不用打字，也不用填手机号';return;
   }
   if(st==='REVEALING'){
