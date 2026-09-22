@@ -97,10 +97,9 @@ details[open] summary::after{content:'▴'}
     <div class=card id=qcard><div class=qno>尚未开始</div></div>
     <div class=say id=say></div>
     <details id=drawer><summary>救场操作</summary><div class=rescue id=rescue></div></details>
-    <details><summary>宾客管理 / 导出</summary><div class=rescue style="grid-template-columns:1fr">
+    <details><summary>宾客管理</summary><div class=rescue style="grid-template-columns:1fr">
       <input id=find placeholder="按昵称搜索宾客" autocomplete=off>
       <div id=list></div>
-      <button class=wide id=csv>导出明细 CSV</button>
     </div></details>
   </main>
   <div id=foot><button class=primary id=go disabled>连接中…</button></div>
@@ -183,7 +182,6 @@ function handle(m){
     if(m.reason===REJECT.BAD_KEY){setLink('srv','需要口令');return askKey(key?'口令不对，再试一次':'')}
     toast('这一步做不了：'+(m.reason||''));return;
   }
-  if(m.type===S2C.CSV)return download(m.filename,m.content);
   if(m.type===S2C.GUEST_LIST){guests=m.guests||[];return renderGuests()}
   if(m.type===S2C.SNAPSHOT&&m.host){Object.assign(H,m.host);noteRemain(m.host.remainMs)}
   if(m.type===S2C.HOST_STATE){Object.assign(H,m);noteRemain(m.remainMs)}
@@ -191,13 +189,6 @@ function handle(m){
     if(!startedAt&&H.qIndex>=0)startedAt=Date.now();
     render();
   }
-}
-
-function download(name,text){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'}));
-  a.download=name;a.click();URL.revokeObjectURL(a.href);
-  toast('已导出');
 }
 
 /* ── 时间预算：主持人全程不知道自己有没有超时 ── */
@@ -328,7 +319,6 @@ document.addEventListener('click',e=>{
     send({type:C2S.HOST_REMOVE,clientId:r.dataset.r,expectedQIndex:H.qIndex});toast('已移除');
   }
 });
-$('#csv').onclick=()=>send({type:C2S.HOST_EXPORT});
 
 connect();render();
 </script>

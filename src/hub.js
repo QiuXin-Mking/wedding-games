@@ -13,7 +13,6 @@
 
 import { Game } from './game.js';
 import { EventLog, replayInto } from './eventlog.js';
-import { exportDetailCsv } from './csv.js';
 import { now } from './clock.js';
 import { C2S, S2C, ROLE, STAGE, REJECT, NOTICE } from './protocol.js';
 
@@ -144,10 +143,6 @@ export class Hub {
   // ── 主持人动作 ───────────────────────────────────────────
 
   handleHostAction(ws, type, payload) {
-    if (type === C2S.HOST_EXPORT) {
-      return { ok: true, csv: exportDetailCsv(this.game) };
-    }
-
     // 纯展示类动作，不碰游戏状态，也不写日志
     if (type === C2S.HOST_SHOW_QR) {
       this.broadcast({ type: S2C.SHOW_QR, on: true }, (m) => m.role === ROLE.SCREEN);

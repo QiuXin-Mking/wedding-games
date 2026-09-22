@@ -42,7 +42,6 @@ export const C2S = Object.freeze({
       随机昵称切断了名字与真人的联系，光靠主持人念、宾客举手认领并不可靠 ——
       嘈杂环境里听错、或者不敢举手怕认错，都会让发奖环节冷场。 */
   HOST_CALL: 'host:call',
-  HOST_EXPORT: 'host:export',
 });
 
 /**
@@ -88,8 +87,6 @@ export const S2C = Object.freeze({
   SHOW_QR: 'qr',
   /** 发奖点名：只发给被叫到的那一位 */
   CALLED: 'called',
-  /** 导出的 CSV 内容，由主持人端触发下载 */
-  CSV: 'csv',
   REJECTED: 'rejected',
   PONG: 'pong',
 });

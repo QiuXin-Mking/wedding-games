@@ -235,8 +235,7 @@ function handleMessage(hub, ws, msg, keys) {
     if (meta.role !== ROLE.HOST) {
       return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
     }
-    const r = hub.handleHostAction(ws, msg.type, msg);
-    if (r?.csv) hub.send(ws, { type: S2C.CSV, filename: 'wedding-quiz.csv', content: r.csv });
+    hub.handleHostAction(ws, msg.type, msg);
     return;
   }
 }
