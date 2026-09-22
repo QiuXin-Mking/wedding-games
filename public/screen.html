@@ -70,14 +70,22 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 <div id=chip><b id=bank>—</b><button id=fs>全屏</button></div>
 <div id=conn></div>
 <div id=stage></div>
-<div id=qrmini><img src=/qr.png alt="" onerror="this.remove()"><div>没进来的扫这里</div></div>
-<div id=qrbig><img src=/qr.png alt="扫码进入" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'url',textContent:location.origin}))"><div>没进来的现在扫</div></div>
+<div id=qrmini><img src=/qr.png alt="" onerror=qrFail(this,1)><div>没进来的扫这里</div></div>
+<div id=qrbig><img src=/qr.png alt="扫码进入" onerror=qrFail(this)><div>没进来的现在扫</div></div>
 <script type=module>
 import {C2S,S2C,STAGE} from '/src/protocol.js';
 const $=s=>document.querySelector(s);
 const stage=$('#stage'),conn=$('#conn');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const key=new URLSearchParams(location.search).get('key')||'';
+
+/* 二维码由 tools/genqr.js 离线生成。还没生成时降级为文字地址，不显示裂图。
+   写成函数而不是内联属性 —— 内联属性里的引号嵌在 JS 字符串里，极易把字符串截断。 */
+window.qrFail=(el,drop)=>{
+  if(drop)return el.remove();
+  const d=document.createElement('div');d.className='url';d.textContent=location.host;
+  el.replaceWith(d);
+};
 
 $('#fs').onclick=()=>{
   // 全屏不只是好看：不全屏的话地址栏里的 ?key= 会被投影给全场
@@ -155,7 +163,7 @@ function render(){
 function paintIdle(){
   cancelAnimationFrame(raf);
   stage.innerHTML='<div class="title serif">婚礼答题</div><div class=rule></div>'+
-    '<img id=qr src=/qr.png alt="扫码进入" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'url',textContent:location.origin}))">'+
+    '<img id=qr src=/qr.png alt="扫码进入" onerror=qrFail(this)>'+
     '<div class=url>扫码进入，不用打字</div>'+
     '<div class=count>已入场 '+S.joined+' 位</div>';
 }

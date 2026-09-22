@@ -20,7 +20,8 @@ import { C2S, S2C, ROLE, REJECT } from './src/protocol.js';
 
 const ROOT = fileURLToPath(new URL('./', import.meta.url));
 const PUBLIC_DIR = join(ROOT, 'public');
-const DATA_DIR = join(ROOT, 'data');
+// 事件日志必须放在 releases/ 之外，否则重新部署会冲掉已产生的比赛数据
+const DATA_DIR = process.env.DATA_DIR || join(ROOT, 'data');
 
 /** 路由到实际文件。**只有这张表里的路径可达**，其余一律 404 */
 const ROUTES = {

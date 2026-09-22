@@ -179,7 +179,7 @@ export class Hub {
         this.#pushFinal();
         break;
       default:
-        this.broadcast(this.#stageOnly());
+        this.#pushSnapshot();
     }
     if (before === STAGE.PAUSED && this.game.stage === STAGE.ASKING) {
       this.broadcast({ type: S2C.RESUMED, remainMs: this.game.deadlineAt - now() });
@@ -251,8 +251,17 @@ export class Hub {
     this.broadcast(payload, (m) => m.role === ROLE.HOST);
   }
 
-  #stageOnly() {
-    return { type: S2C.SNAPSHOT, stage: this.game.stage, qIndex: this.game.qIndex };
+  /**
+   * 给每条连接推一份**完整**快照。
+   *
+   * 早先这里推的是只带 stage/qIndex 的残缺版，于是同一个 snapshot 类型有时全量、
+   * 有时残缺 —— 大屏按 `m.bank||'—'` 取值，收到残缺版就把题库角标抹成了「—」，
+   * 顺带还清掉了题面。消息类型的形状必须恒定。
+   */
+  #pushSnapshot() {
+    for (const [ws, meta] of this.conns) {
+      this.#raw(ws, JSON.stringify(this.snapshotFor(meta.clientId, meta.role)));
+    }
   }
 
   /**
@@ -280,6 +289,9 @@ export class Hub {
     }
     if (g.stage === STAGE.REVEAL) {
       base.reveal = g.revealPayload();
+      // 结算态也要带题目内容：大屏要显示题干与高亮的正确答案。
+      // 不带的话，大屏中途刷新就只剩一个排行榜，题面整个丢了。
+      base.question = g.questionPayloadFor(clientId);
       if (clientId) base.myResult = g.myResultPayload(clientId);
     }
     if (g.stage === STAGE.FINAL) {

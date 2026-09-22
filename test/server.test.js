@@ -312,3 +312,35 @@ describe('HTTP 静态层', () => {
     assert.match(r.headers.get('cache-control'), /max-age=3600/);
   });
 });
+
+describe('snapshot 的形状必须恒定', () => {
+  test('每一条 snapshot 都带 bank 与 total，不存在残缺版', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'srv4-'));
+    const app4 = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, tickMs: 30 });
+    const p4 = await app4.listen(0);
+    const mk = async (role, key) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${p4}`);
+      const q = [];
+      ws.on('message', (r) => q.push(JSON.parse(r.toString())));
+      await new Promise((r) => ws.on('open', r));
+      ws.send(JSON.stringify({ type: C2S.HELLO, role, key }));
+      return { ws, q };
+    };
+    const h = await mk(ROLE.HOST, HOST_KEY);
+    const s = await mk(ROLE.SCREEN, SCREEN_KEY);
+    await new Promise((r) => setTimeout(r, 80));
+    // host:start 进 READY —— 早先这一步会广播只带 stage/qIndex 的残缺 snapshot
+    h.ws.send(JSON.stringify({ type: C2S.HOST_START, expectedQIndex: -1 }));
+    await new Promise((r) => setTimeout(r, 120));
+
+    const snaps = s.q.filter((m) => m.type === S2C.SNAPSHOT);
+    assert.ok(snaps.length >= 2, '连接时与进入 READY 时各一条');
+    for (const [i, m] of snaps.entries()) {
+      assert.ok(m.bank, `第 ${i + 1} 条 snapshot 缺 bank —— 大屏角标会被抹成「—」`);
+      assert.equal(typeof m.total, 'number', `第 ${i + 1} 条 snapshot 缺 total`);
+    }
+    h.ws.close(); s.ws.close();
+    await app4.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
