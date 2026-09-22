@@ -1,0 +1,19 @@
+{
+  "name": "wedding-games",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "婚礼互动答题小游戏 H5 —— 大屏 + 宾客手机实时同步答题",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "check:nicknames": "node tools/check-nicknames.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
