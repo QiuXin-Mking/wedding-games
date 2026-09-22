@@ -13,6 +13,7 @@
     "test": "node --test \"test/**/*.test.js\"",
     "check:nicknames": "node tools/check-nicknames.js",
     "qr": "node tools/genqr.js",
+    "names": "node tools/print-names.js",
     "loadtest": "node tools/loadtest.js"
   },
   "dependencies": {
