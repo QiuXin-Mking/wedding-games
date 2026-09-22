@@ -78,6 +78,10 @@ details[open] summary::after{content:'▴'}
 
 /* ── 宾客管理 ─────────────────────── */
 #find{width:100%;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:rgba(42,28,22,.035);color:inherit;font:15px inherit}
+.who s{flex:none;width:1.9em;text-decoration:none;text-align:right;color:var(--ink3);
+  font:600 14px/1 system-ui;font-variant-numeric:tabular-nums}
+.who s.top{color:var(--seal)}
+#more{padding:8px 0 2px;color:var(--ink3);font-size:12.5px;line-height:1.6}
 .who{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
 .who u{flex:1;text-decoration:none;font-family:"Songti SC",serif;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .who button{min-height:36px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:none;color:var(--ink2);font:13px inherit;cursor:pointer}
@@ -100,6 +104,7 @@ details[open] summary::after{content:'▴'}
     <details><summary>宾客管理</summary><div class=rescue style="grid-template-columns:1fr">
       <input id=find placeholder="按昵称搜索宾客" autocomplete=off>
       <div id=list></div>
+      <div id=more></div>
     </div></details>
   </main>
   <div id=foot><button class=primary id=go disabled>连接中…</button></div>
@@ -271,15 +276,22 @@ function render(){
 
 function renderGuests(){
   const kw=$('#find').value.trim();
-  const rows=guests.filter(g=>!kw||g.nickname.includes(kw)).slice(0,8);
-  $('#list').innerHTML=rows.map(g=>'<div class=who><u>'+esc(g.nickname)+'</u>'+
+  const hit=guests.filter(g=>!kw||g.nickname.includes(kw));
+  const rows=hit.slice(0,8);
+  $('#list').innerHTML=rows.map(g=>'<div class=who><s'+(g.rank<=3?' class=top':'')+'>'+(g.rank??'')+'</s><u>'+esc(g.nickname)+'</u>'+
     '<span class=num>'+g.total+'</span>'+
     // 发奖点名：让这位宾客的手机全屏亮起「叫的就是您」。
     // 随机昵称和真人之间没有联系，光靠念名字 + 举手认领并不可靠。
     '<button data-c="'+esc(g.clientId)+'">点名</button>'+
     '<button data-n="'+esc(g.clientId)+'">换名字</button>'+
     '<button class=danger data-r="'+esc(g.clientId)+'">移除</button></div>').join('')||
-    (kw?'<div class=who><u>没找到</u></div>':'');
+    (kw?'<div class=who><u>没找到</u></div>':'<div class=who><u>还没有人入场</u></div>');
+  // 只列前 8 条，不然 400 人能把整个页面撑爆。要说清楚剩下的怎么找到，
+  // 否则主持人会以为系统只认得这 8 个人。
+  const more=$('#more');
+  if(more)more.textContent=hit.length>8
+    ?('按名次排，另有 '+(hit.length-8)+' 位没列出 · 搜昵称可以找到任何人')
+    :(hit.length?'按名次排':'');
 }
 $('#find').oninput=renderGuests;
 // 宾客列表按需拉，不塞进 hostState —— 否则每次有人作答都要推 400 条

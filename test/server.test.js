@@ -556,3 +556,69 @@ describe('后台运维页', () => {
     b.ws.close(); await app2.close();
   });
 });
+
+describe('宾客管理按名次排', () => {
+  // 发奖时主持人要找的是第一名，不是最早扫码的那个人。
+  // 原先按入场顺序排、前端又只显示 8 条，等于「最早进来的 8 个人」——
+  // 想点第一名只能靠搜昵称，而那一刻全场都在等他念名字。
+  test('列表按名次降序，且名次与大屏排行榜一致', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gsort-'));
+    const app = createApp({ dataDir: dir, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
+    const port = await app.listen(0);
+    const mk = async (hello) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+      const q = [];
+      ws.on('message', (r) => q.push(JSON.parse(r.toString())));
+      await new Promise((r) => ws.on('open', r));
+      ws.send(JSON.stringify(hello));
+      return { ws, q, send: (o) => ws.send(JSON.stringify(o)) };
+    };
+    const wait = (q, pred, ms = 3000) => new Promise((res, rej) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const hit = [...q].reverse().find(pred);
+        if (hit) { clearInterval(iv); res(hit); }
+        else if (Date.now() - t0 > ms) { clearInterval(iv); rej(new Error('等超时')); }
+      }, 20);
+    });
+
+    const host = await mk({ type: C2S.HELLO, role: ROLE.HOST, key: HOST_KEY });
+    await wait(host.q, (m) => m.type === S2C.SNAPSHOT);
+
+    // 三位宾客按入场顺序 a→b→c，但让最后入场的 c 拿最高分
+    const gs = [];
+    for (const id of ['a', 'b', 'c']) {
+      const g = await mk({ type: C2S.HELLO, role: ROLE.GUEST });
+      await wait(g.q, (m) => m.type === S2C.SNAPSHOT);
+      g.send({ type: C2S.JOIN, clientId: id });
+      await wait(g.q, (m) => m.type === S2C.IDENTITY);
+      gs.push(g);
+    }
+    host.send({ type: C2S.HOST_START, expectedQIndex: -1 });
+    await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.READY);
+    host.send({ type: C2S.HOST_NEXT, expectedQIndex: -1 });
+    const q0 = await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.ASKING);
+
+    // 只有 c 答对
+    gs[2].send({ type: C2S.ANSWER, qIndex: 0, optionIndex: q0.correctIndex });
+    await wait(gs[2].q, (m) => m.type === S2C.ANSWER_ACK);
+    host.send({ type: C2S.HOST_EARLY_SETTLE, expectedQIndex: 0 });
+    await wait(host.q, (m) => m.type === S2C.HOST_STATE && m.stage === STAGE.REVEAL);
+
+    host.q.length = 0;
+    host.send({ type: C2S.HOST_GUESTS, expectedQIndex: 0 });
+    const list = await wait(host.q, (m) => m.type === S2C.GUEST_LIST);
+
+    assert.equal(list.guests.length, 3);
+    assert.equal(list.guests[0].clientId, 'c',
+      '最后入场但分最高的人必须排第一，否则发奖时点不到他');
+    assert.equal(list.guests[0].rank, 1, '必须带名次，主持人要靠它确认点的是第一名');
+    const totals = list.guests.map((g) => g.total);
+    assert.deepEqual([...totals].sort((x, y) => y - x), totals, '必须按分数降序');
+    assert.deepEqual(list.guests.map((g) => g.rank), [1, 2, 3], '名次要连续且从 1 开始');
+
+    for (const g of gs) g.ws.close();
+    host.ws.close();
+    await app.close();
+  });
+});

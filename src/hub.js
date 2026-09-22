@@ -233,8 +233,12 @@ export class Hub {
     if (type === C2S.HOST_GUESTS) {
       this.send(ws, {
         type: S2C.GUEST_LIST,
-        guests: [...this.game.guests.values()].map((g) => ({
-          clientId: g.clientId, nickname: g.nickname, total: this.game.tally(g.clientId).total,
+        // 按名次排，不按入场顺序 —— 发奖时主持人要找的是第一名，
+        // 而不是最早扫码的那个人。复用 leaderboard 的三级排序，
+        // 这样这里的名次和大屏上打出来的完全一致，不会出现「大屏说他第一、
+        // 控制台里却排在第七」这种当众对不上的情况。
+        guests: this.game.leaderboard().map(({ clientId, nickname, total, rank }) => ({
+          clientId, nickname, total, rank,
         })),
       });
       return { ok: true, events: [] };
