@@ -27,6 +27,15 @@ export class Hub {
     /** ws -> {role, clientId} */
     this.conns = new Map();
     this.recovered = null;
+    /**
+     * progress / hostState 只标脏，由 tick 统一刷。
+     *
+     * 早先是每收到一个答案就向全场广播一次 progress —— 400 人同时提交就是
+     * 400 × 400 = 16 万条消息（O(n²)），实测回执延迟从 70ms 涨到 2 秒；
+     * 按每条 60 字节算是 9.6 MB，在 3 Mbps 的现场链路上要走 25 秒。
+     * 进度计数器每 200ms 刷一次完全够用，没必要逐条广播。
+     */
+    this.dirty = { progress: false, host: false };
 
     if (resume && resume.length) {
       this.recovered = replayInto(this.game, resume);
@@ -194,10 +203,14 @@ export class Hub {
   /** 由 setInterval 调用。结算发生时自动推送 reveal */
   tick() {
     const r = this.game.tick(now());
-    if (!r.events?.length) return r;
-    this.#persist(r);
-    this.pushReveal();
-    this.#pushHostState();
+    if (r.events?.length) {
+      this.#persist(r);
+      this.pushReveal();
+      this.#pushHostState();
+    }
+    // 状态切换要立刻让宾客看到，所以结算的 reveal 是直发的；
+    // 只有高频的计数器类推送走合并。
+    this.flushDirty();
     return r;
   }
 
@@ -237,18 +250,31 @@ export class Hub {
     }
   }
 
+  /** 标脏，不立即发。由 tick 合并刷出 */
   #pushProgress() {
-    // 分母是已入场人数，不是连接数（X-1）
-    this.broadcast({
-      type: S2C.PROGRESS,
-      answered: this.game.answeredCount(),
-      joined: this.game.joined,
-    });
+    this.dirty.progress = true;
   }
 
+  /** 标脏。hostStatePayload 内部要算一次排行榜，更不该逐条触发 */
   #pushHostState() {
-    const payload = this.game.hostStatePayload();
-    this.broadcast(payload, (m) => m.role === ROLE.HOST);
+    this.dirty.host = true;
+  }
+
+  /** 立即刷出被标脏的推送。tick 每 200ms 调一次 */
+  flushDirty() {
+    if (this.dirty.progress) {
+      this.dirty.progress = false;
+      // 分母是已入场人数，不是连接数（X-1）
+      this.broadcast({
+        type: S2C.PROGRESS,
+        answered: this.game.answeredCount(),
+        joined: this.game.joined,
+      });
+    }
+    if (this.dirty.host) {
+      this.dirty.host = false;
+      this.broadcast(this.game.hostStatePayload(), (m) => m.role === ROLE.HOST);
+    }
   }
 
   /**
