@@ -125,7 +125,7 @@ function handle(m){
     case S2C.SNAPSHOT:
       S.stage=m.stage;S.joined=m.joined;S.answered=m.answered;$('#bank').textContent=m.bank||'—';
       $('#bank').className=/正式/.test(m.bank||'')?'live':'';
-      S.q=m.question||null;S.reveal=m.reveal||null;
+      S.q=m.question||null;S.reveal=m.reveal||null;S.final=m.final||null;
       if(S.q)deadline=S.q.deadlineAt;
       return render();
     case S2C.QUESTION:S.q=m;S.reveal=null;S.stage=STAGE.ASKING;deadline=m.deadlineAt;return render();
