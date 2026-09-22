@@ -11,7 +11,9 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test \"test/**/*.test.js\"",
-    "check:nicknames": "node tools/check-nicknames.js"
+    "check:nicknames": "node tools/check-nicknames.js",
+    "qr": "node tools/genqr.js",
+    "loadtest": "node tools/loadtest.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
