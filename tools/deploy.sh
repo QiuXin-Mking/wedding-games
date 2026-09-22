@@ -86,7 +86,7 @@ case "${1:-deploy}" in
     done
     echo
     echo "✓ 发布完成"
-    echo "  ⚠️ 三端浏览器需强制刷新（Ctrl+F5）——静态资源缓存一小时"
+    echo "  静态资源走 ETag 协商缓存，刷新即生效，无需强制刷新"
     ;;
 
   *)

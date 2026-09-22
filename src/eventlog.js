@@ -18,6 +18,9 @@ import { EV } from './game.js';
 import { STAGE, OUTCOME, RULES } from './protocol.js';
 import { wallNow } from './clock.js';
 
+/** 续用历史日志的时效窗口。超过这个时长的日志视为「上一场」，不再续用 */
+export const RESUME_WINDOW_MS = 6 * 60 * 60 * 1000;
+
 export class EventLog {
   /** @param {string} file */
   constructor(file) {
@@ -38,16 +41,37 @@ export class EventLog {
 
   /**
    * 打开 dir 下最新的日志继续追加（崩溃重启后走这条）。
+   *
+   * **只续用「还热着」的日志** —— 最后一条事件在 RESUME_WINDOW_MS 之内。
+   *
+   * 早先是无条件取最新的一份，结果是：9/28 彩排跑完整流程（主持人必然会按到
+   * 「公布最终排名」，日志以 game_finish 结尾），10/6 婚礼当天开机就直接恢复成
+   * FINAL 态，**所有新宾客 join 一律被拒，全场一个人都进不来**，而且 host:start
+   * 要求 IDLE 也救不回来。实测复现过。
+   *
+   * 六小时的窗口同时覆盖两头：几天前的彩排绝不会被续用；而崩溃后两秒被
+   * systemd 拉起、甚至跨零点重启，都还在窗口内，不会丢掉正在进行的这一场。
+   *
    * @param {string} dir
-   * @returns {EventLog|null} 没有历史日志时返回 null
+   * @param {{now?: number, window?: number}} [opts]
+   * @returns {{log: EventLog, events: Array<object>}|null}
    */
-  static openLatest(dir) {
+  static openResumable(dir, opts = {}) {
     if (!existsSync(dir)) return null;
     const files = readdirSync(dir).filter((f) => f.endsWith('.jsonl')).sort();
     if (files.length === 0) return null;
-    const log = new EventLog(join(dir, files[files.length - 1]));
-    log.seq = log.read().at(-1)?.seq ?? 0;
-    return log;
+
+    const file = join(dir, files[files.length - 1]);
+    const events = EventLog.parse(readFileSync(file, 'utf8'));
+    const lastTs = events.at(-1)?.ts ?? 0;
+    const age = (opts.now ?? Date.now()) - lastTs;
+    if (age > (opts.window ?? RESUME_WINDOW_MS)) {
+      return { log: null, events, stale: true, ageMs: age, file };
+    }
+
+    const log = new EventLog(file);
+    log.seq = events.at(-1)?.seq ?? 0;
+    return { log, events, stale: false, ageMs: age, file };
   }
 
   /**

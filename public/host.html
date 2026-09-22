@@ -23,6 +23,8 @@ html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);
 #link.ok{color:var(--ok)}#link.me{color:var(--seal)}#link.srv{color:var(--seal)}
 #clock{font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:600}
 #clock.over{color:var(--seal)}
+#pace{color:var(--ink3)}
+#pace.over{color:var(--seal);font-weight:600}
 
 main{flex:1;padding:14px;display:flex;flex-direction:column;gap:14px}
 
@@ -77,7 +79,7 @@ details[open] summary::after{content:'▴'}
 <div id=app>
   <div id=bar>
     <span class=tag id=bank>—</span>
-    <span id=clock class=num>0:00</span>
+    <span id=clock class=num>0:00</span><span id=pace></span>
     <span id=link>连接中…</span>
   </div>
   <main>
@@ -94,7 +96,7 @@ details[open] summary::after{content:'▴'}
 </div>
 <div id=toast></div>
 <script type=module>
-import {C2S,S2C,STAGE} from '/src/protocol.js';
+import {C2S,S2C,STAGE,ROLE,REJECT} from '/src/protocol.js';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const key=new URLSearchParams(location.search).get('key')||'';
@@ -127,7 +129,7 @@ function send(m){
 function connect(){
   clearTimeout(timer);
   ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
-  ws.onopen=()=>{back=800;setLink('ok','已连接');ws.send(JSON.stringify({type:C2S.HELLO,role:'host',key}))};
+  ws.onopen=()=>{back=800;setLink('ok','已连接');ws.send(JSON.stringify({type:C2S.HELLO,role:ROLE.HOST,key}))};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}handle(m)};
   ws.onclose=()=>{diagnose();timer=setTimeout(connect,back);back=Math.min(back*2,8000)};
   ws.onerror=()=>{try{ws.close()}catch{}};
@@ -136,10 +138,10 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 function handle(m){
   if(m.type===S2C.REJECTED){
-    if(m.reason==='badKey'){setLink('srv','口令不对');$('#qcard').innerHTML='<div class=qno>主持人口令不对，检查链接里的 key</div>';return}
+    if(m.reason===REJECT.BAD_KEY){setLink('srv','口令不对');$('#qcard').innerHTML='<div class=qno>主持人口令不对，检查链接里的 key</div>';return}
     toast('这一步做不了：'+(m.reason||''));return;
   }
-  if(m.type==='csv')return download(m.filename,m.content);
+  if(m.type===S2C.CSV)return download(m.filename,m.content);
   if(m.type===S2C.GUEST_LIST){guests=m.guests||[];return renderGuests()}
   if(m.type===S2C.SNAPSHOT&&m.host)Object.assign(H,m.host);
   if(m.type===S2C.HOST_STATE)Object.assign(H,m);
@@ -162,10 +164,17 @@ setInterval(()=>{
   if(!startedAt){el.textContent='0:00';return}
   const s=Math.floor((Date.now()-startedAt)/1000);
   el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
-  const left=H.total-(H.qIndex+1);
   const pace=H.qIndex>=0?s/(H.qIndex+1):0;      // 每题实际耗时
-  el.className='num'+(pace*H.total>20*60?' over':'');
-  el.title='按当前速度，全场约 '+Math.round(pace*H.total/60)+' 分钟';
+  const left=H.total-(H.qIndex+1);
+  const est=Math.round(pace*H.total/60);
+  const over=H.qIndex>=0&&pace*H.total>20*60;
+  el.className='num'+(over?' over':'');
+  // 触屏上 title 根本触发不了，超时提示必须落到看得见的 DOM
+  const pe=document.getElementById('pace');
+  if(pe){
+    pe.textContent=H.qIndex<0?'':('还剩 '+left+' 题 · 预计 '+est+' 分钟'+(over?' ⚠ 会超时':''));
+    pe.className=over?'over':'';
+  }
 },1000);
 
 function render(){
@@ -246,6 +255,10 @@ document.addEventListener('click',e=>{
     if(b.disabled)return;
     const a=b.dataset.a;if(!a)return;
     if(b.dataset.confirm&&!confirm(b.textContent+'？这一步不可撤销。'))return;
+    // 「公布最终排名」和「下一题」共用底部同一个位置，而主持人此时已经在那里
+    // 连点了 12 次。点下去就进 FINAL：救场按钮全禁用、新宾客一律被拒，
+    // 且进程内没有任何路径能回到 REVEAL。AC-58 要求 finish 必须二次确认。
+    if(a===C2S.HOST_FINISH&&!confirm('公布最终排名？\n\n这会结束整场游戏，不能反悔，之后也不能再让人入场。'))return;
     if(send({type:a,expectedQIndex:H.qIndex}))toast('已发送：'+b.textContent.replace(/（.*/,''));
     return;
   }

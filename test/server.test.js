@@ -278,8 +278,8 @@ describe('个人成绩不进广播', () => {
 });
 
 describe('HTTP 静态层', () => {
-  const get = async (path) => {
-    const res = await fetch(`http://127.0.0.1:${port}${path}`);
+  const get = async (path, headers) => {
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, { headers });
     return { status: res.status, headers: res.headers, body: await res.text() };
   };
 
@@ -307,9 +307,22 @@ describe('HTTP 静态层', () => {
     }
   });
 
-  test('静态资源带强缓存', async () => {
+  test('静态资源走 ETag 协商缓存，改版后不会吃到旧页面', async () => {
     const r = await get('/');
-    assert.match(r.headers.get('cache-control'), /max-age=3600/);
+    assert.match(r.headers.get('cache-control'), /no-cache/);
+    const etag = r.headers.get('etag');
+    assert.ok(etag, '必须带 ETag，否则每次都要重传整页');
+
+    // 内容没变：回 304，不重传正文
+    const r304 = await get('/', { 'if-none-match': etag });
+    assert.equal(r304.status, 304);
+    assert.equal(r304.body, '');
+
+    // 拿着过期的 ETag：必须回 200 带新正文，而不是 304。
+    // 这条正是强缓存踩过的坑 —— 部署完手机还在白屏，因为它压根不来问。
+    const rStale = await get('/', { 'if-none-match': 'W/"deadbeef-0"' });
+    assert.equal(rStale.status, 200);
+    assert.ok(rStale.body.includes('婚礼答题'));
   });
 });
 

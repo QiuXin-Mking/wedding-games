@@ -71,21 +71,34 @@ function serveStatic(req, res) {
   }
 
   const type = MIME[extname(file)] ?? 'application/octet-stream';
-  const headers = { 'content-type': type, 'cache-control': 'public, max-age=3600' };
 
   // 优先返回预压缩产物。峰值时 400 人同时拉首屏，CPU 要留给 WebSocket，
   // 不能在这时候做运行时压缩。
   const gz = `${file}.gz`;
   const acceptsGzip = (req.headers['accept-encoding'] ?? '').includes('gzip');
-  if (acceptsGzip && existsSync(gz)) {
-    headers['content-encoding'] = 'gzip';
-    headers.vary = 'Accept-Encoding';
-    res.writeHead(200, headers);
-    return res.end(readFileSync(gz));
+  const served = acceptsGzip && existsSync(gz) ? gz : file;
+  const st = statSync(served);
+
+  // 曾经用 cache-control: max-age=3600。它在婚礼当天并不省带宽 ——
+  // 宾客每人只扫一次码，首次请求本来就没有缓存可用；强缓存只在「中途刷新 /
+  // 重连」时才命中。而代价是：任何一次改版之后，凡是访问过的设备都会在
+  // 一小时内继续吃旧版本。测试期真实踩到过：修好的页面部署上去，手机照样白屏。
+  //
+  // 改成 ETag + 304：浏览器每次问一句「变了吗」，没变回 304（几十字节，
+  // 比 7 KB 的 200 还省），变了立刻拿到新版。两头都优于强缓存。
+  const etag = `W/"${st.size.toString(16)}-${st.mtimeMs.toString(36)}"`;
+  if (req.headers['if-none-match'] === etag) {
+    res.writeHead(304, { etag, 'cache-control': 'no-cache' });
+    return res.end();
   }
 
+  const headers = { 'content-type': type, 'cache-control': 'no-cache', etag };
+  if (served === gz) {
+    headers['content-encoding'] = 'gzip';
+    headers.vary = 'Accept-Encoding';
+  }
   res.writeHead(200, headers);
-  res.end(readFileSync(file));
+  res.end(readFileSync(served));
 }
 
 /**
@@ -100,12 +113,33 @@ export function createApp(opts = {}) {
   const bank = loadBank();
   const nicknames = loadDefaultPool();
 
-  // 有历史日志就接着写并重放，否则开新的一场
-  const existing = EventLog.openLatest(dataDir);
-  const log = existing ?? EventLog.create(dataDir);
-  const resume = existing ? existing.read() : null;
+  // 只续用「还热着」的日志；几天前的彩排绝不会被当成本场继续
+  const found = EventLog.openResumable(dataDir, { window: opts.resumeWindowMs });
+  let log = found?.log ?? null;
+  let resume = null;
+  let resumeNote = null;
+
+  if (found?.stale) {
+    const days = (found.ageMs / 86400000).toFixed(1);
+    resumeNote = `上一份日志已是 ${days} 天前的（多半是彩排），不续用，开新的一场`;
+  } else if (found?.log) {
+    // 题库对不上就不能接着跑：彩排用 test、正式用 wedding，
+    // 硬接会把婚礼题库套在测试题库的作答记录上，连备用题下标都会错位
+    const loggedBank = found.events.find((e) => e.type === 'boot')?.bank;
+    if (loggedBank && loggedBank !== bank.name) {
+      found.log.close();
+      log = null;
+      resumeNote = `日志记的是「${loggedBank}」题库、当前是「${bank.name}」，不续用，开新的一场`;
+    } else {
+      resume = found.events;
+    }
+  }
+  if (!log) log = EventLog.create(dataDir);
 
   const hub = new Hub({ bank, nicknames, log, resume });
+  hub.resumeNote = resumeNote;
+  // 每次启动都留一条痕迹，事后能看出重启过几次、几点重启（否则无从审计）
+  if (resume) log.append([{ type: 'boot', bank: bank.name, questionCount: bank.total, resumed: resume.length }]);
   const server = createServer(serveStatic);
   const wss = new WebSocketServer({ noServer: true });
 
@@ -194,7 +228,7 @@ function handleMessage(hub, ws, msg, keys) {
       return hub.send(ws, { type: S2C.REJECTED, reason: REJECT.BAD_KEY });
     }
     const r = hub.handleHostAction(ws, msg.type, msg);
-    if (r?.csv) hub.send(ws, { type: 'csv', filename: 'wedding-quiz.csv', content: r.csv });
+    if (r?.csv) hub.send(ws, { type: S2C.CSV, filename: 'wedding-quiz.csv', content: r.csv });
     return;
   }
 }
@@ -209,6 +243,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(`  端口     ${port}`);
   console.log(`  题库     ${bank.label}（正题 ${bank.total} 道，备用 ${bank.spares.length} 道）`);
   console.log(`  昵称池   ${app.hub.game.nicknames.pool.length} 条`);
+  if (app.hub.resumeNote) console.log(`  ${app.hub.resumeNote}`);
   if (app.hub.recovered) {
     console.log(`  已从事件日志恢复：${app.hub.recovered.applied} 条事件，` +
       `落在第 ${app.hub.recovered.qIndex + 1} 题结算态` +

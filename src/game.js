@@ -211,9 +211,13 @@ export class Game {
     const remainMs = this.originalDeadlineAt - nowMs;
     const correct = optionIndex === q.answer;
     const gained = scoreOf(correct, remainMs);
-    // 耗时用于排行榜兜底排序；延长期间提交会 > 一题的时长，属实
     const elapsedMs = Math.max(0, RULES.QUESTION_MS - remainMs);
-    const outcome = correct ? OUTCOME.CORRECT : OUTCOME.WRONG;
+    // 延长期内提交（remainMs <= 0）一律记 timeout，与 design §4.3 一致。
+    // 早先记成 correct/wrong「如实反映对错」，后果是三处失真：
+    // 主持人唱分的「答对 N 人」把 0 分的人算进去；终局出现「答对 3 题、总分 0」
+    // 这种自相矛盾；elapsedSum 被灌进 >20 秒的值，污染排行榜第二排序键。
+    // 延长只给看清题的机会、不补分，那它就不该算作一次有效作答。
+    const outcome = remainMs <= 0 ? OUTCOME.TIMEOUT : (correct ? OUTCOME.CORRECT : OUTCOME.WRONG);
 
     g.answers.set(this.qIndex, { optionIndex, outcome, gained, elapsedMs });
 
@@ -512,7 +516,14 @@ export class Game {
     };
   }
 
-  /** 某位宾客的本题结果 */
+  /**
+   * 某位宾客的本题结果。
+   *
+   * **没有作答记录时 outcome 为 null，绝不谎称 timeout。**
+   * 两种情况会没有记录：①崩溃重放后落在一个没被正常结算的题上；
+   * ②宾客在结算态才入场。这两种都不是「他没赶上」，
+   * 而前端若把 null 当成超时显示「没赶上」，就正好踩中 AC-09 明令禁止的那件事。
+   */
   myResultPayload(clientId) {
     const a = this.guests.get(clientId)?.answers.get(this.qIndex);
     const t = this.tally(clientId);
@@ -520,7 +531,7 @@ export class Game {
     return {
       type: S2C.MY_RESULT,
       qIndex: this.qIndex,
-      outcome: a?.outcome ?? OUTCOME.TIMEOUT,
+      outcome: a?.outcome ?? null,
       gained: a?.gained ?? 0,
       total: t.total,
       rank: r?.rank ?? null,

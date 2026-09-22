@@ -73,7 +73,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 <div id=qrmini><img src=/qr.png alt="" onerror=qrFail(this,1)><div>没进来的扫这里</div></div>
 <div id=qrbig><img src=/qr.png alt="扫码进入" onerror=qrFail(this)><div>没进来的现在扫</div></div>
 <script type=module>
-import {C2S,S2C,STAGE} from '/src/protocol.js';
+import {C2S,S2C,STAGE,ROLE} from '/src/protocol.js';
 const $=s=>document.querySelector(s);
 const stage=$('#stage'),conn=$('#conn');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -109,7 +109,7 @@ function send(m){if(ws?.readyState===1)ws.send(JSON.stringify(m))}
 function connect(){
   clearTimeout(timer);
   ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
-  ws.onopen=()=>{back=800;conn.textContent='';conn.className='';send({type:C2S.HELLO,role:'screen',key});sync()};
+  ws.onopen=()=>{back=800;conn.textContent='';conn.className='';send({type:C2S.HELLO,role:ROLE.SCREEN,key});sync()};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}handle(m)};
   ws.onclose=()=>{conn.textContent='连接中断，正在重连…';conn.className='bad';timer=setTimeout(connect,back);back=Math.min(back*2,8000)};
   ws.onerror=()=>{try{ws.close()}catch{}};
@@ -143,6 +143,9 @@ function tickLoop(){
   cancelAnimationFrame(raf);
   const el=$('#big');if(!el)return;
   const step=()=>{
+    // 暂停时倒计时必须停住。大屏这个 17vh 的数字是全场的节奏，
+    // 主持人按了暂停它却照走到 0，等于暂停没生效。
+    if(S.paused){raf=requestAnimationFrame(step);return}
     const left=Math.max(0,deadline-offset-Date.now());
     const s=Math.ceil(left/1000);
     el.textContent=s;
@@ -175,7 +178,8 @@ function paintAsk(){
     '<div class="qtext serif">'+esc(q.text)+'</div>'+
     '<div class=opts>'+q.options.map((o,i)=>
       '<div class=opt><span class=k>'+'ABCD'[i]+'</span><span>'+esc(o)+'</span></div>').join('')+'</div>'+
-    '<div class=answered id=ans></div>';
+    '<div class=answered id=ans></div>'+
+    (S.paused?'<div class=lead style="color:var(--seal);font-weight:600">暂停中</div>':'');
   patchProgress();tickLoop();
 }
 
@@ -194,8 +198,7 @@ function paintReveal(){
       '<div class=lead>所有人都不计分</div>'+board(r.top5,'当前前五名');
     return;
   }
-  const max=Math.max(1,...(r?.distribution||[1]));
-  stage.innerHTML='<div class=qno>第 '+((r?.qIndex??0)+1)+' 题 · 正确答案</div>'+
+    stage.innerHTML='<div class=qno>第 '+((r?.qIndex??0)+1)+' 题 · 正确答案</div>'+
     '<div class="qtext serif">'+esc(q?.text||'')+'</div>'+
     '<div class=opts>'+(q?.options||[]).map((o,i)=>
       '<div class="opt'+(i===r?.correctIndex?' right':'')+'"><span class=k>'+'ABCD'[i]+'</span>'+

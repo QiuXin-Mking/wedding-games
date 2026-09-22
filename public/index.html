@@ -2,6 +2,14 @@
 /* 进度由文件里每隔约 20% 的 p(n) 调用推进 —— 浏览器解析到哪就报到哪，
    是真实进度，不是定时器假动画。假进度条卡在 90% 比白屏更折磨人。 */
 p=function(n){var b=document.getElementById('bar');if(b)b.style.transform='scaleX('+n/100+')'}
+/* 连不上时不能永远停在「正在进入」+ 进度条走满 —— 那正是「假进度卡住」的观感。
+   12 秒还没进入游戏就说人话，并给一个重试的出口。 */
+setTimeout(function(){
+  var b=document.getElementById('boot');
+  if(b)b.innerHTML='<div style="font:19px/1.6 \'Songti SC\',serif">网络有点慢，还没连上</div>'+
+    '<div style="font-size:15px;opacity:.8">可以再扫一次桌上的二维码</div>'+
+    '<button onclick="location.reload()" style="min-height:48px;padding:0 28px;border:0;border-radius:10px;background:#C8362F;color:#fff;font:600 16px/1 inherit">重　试</button>';
+},12000);
 </script><style>
 /* boot 之外的一切都在这之后 —— 上面那段必须先于它到达，
    浏览器边收边渲染，400 人集中扫码时每人只分到约 900 B/s。 */
@@ -34,6 +42,7 @@ main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-con
 .opt{position:relative;display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 64px 12px 14px;border:1px solid var(--line2);border-radius:10px;background:transparent;color:inherit;font:400 17px/1.4 inherit;text-align:left;cursor:pointer;transition:border-color .16s,background-color .16s,transform .12s cubic-bezier(.23,1,.32,1)}
 .opt:active{transform:scale(.985)}
 .opt .k{flex:none;width:26px;height:26px;border:1px solid var(--line2);border-radius:50%;display:grid;place-content:center;font:500 13px/1 system-ui;color:var(--ink2);transition:border-color .16s,color .16s}
+.opt.picking{border-color:var(--seal)}
 .opt[aria-pressed=true]{border-color:var(--seal);background:rgba(200,54,47,.045)}
 .opt[aria-pressed=true] .k{border-color:var(--seal);color:var(--seal)}
 .opt.right{border-color:var(--gold);background:rgba(201,162,39,.09)}
@@ -131,6 +140,9 @@ function runTick(){
   cancelAnimationFrame(raf);
   const bar=$('#prog i');
   const step=()=>{
+    // 暂停时必须停住。主持人按暂停是为了让整桌敬酒的人赶上（§9 的唯一缓解手段），
+    // 而倒计时照走到 0 就等于暂停没生效。
+    if(S.paused){raf=requestAnimationFrame(step);return}
     const left=deadline-offset-Date.now();
     if(left<=0){tick.textContent='0';bar.style.transform='scaleX(0)';return}
     tick.textContent=Math.ceil(left/1000);
@@ -169,7 +181,12 @@ function handle(m){
       if(m.me)S.me=m.me;
       S.q=m.question||null;S.reveal=m.reveal||null;S.my=m.myResult||null;
       S.final=m.final||null;
+      // pending 也必须清。漏了它的话：弱网下点完选项、ack 没回来就断线，
+      // 重连后 sent 被置空而 pending 还在，底部永远显示「正在提交…」，
+      // 宾客以为还在提交就不再点，最后 0 分。
+      S.pending=null;
       if(S.q){deadline=S.q.deadlineAt;S.sent=S.q.mySubmitted?S.q.myOption:null}
+      S.paused=(m.stage==='PAUSED');
       return render();
     }
     case S2C.IDENTITY:S.me={clientId:m.clientId,nickname:m.nickname,total:0,correctCount:0};S.stage='REVEALING';return render();
@@ -192,6 +209,14 @@ function handle(m){
     case S2C.PAUSED:S.paused=true;return render();
     case S2C.RESUMED:S.paused=false;deadline=Date.now()+offset+(m.remainMs||0);return render();
     case S2C.NOTICE:return flash(m.text);
+    case S2C.REJECTED:{
+      // 大屏和主持人端都有失败界面，唯独宾客端没有 —— 失败会表现为按钮永久变灰、零提示
+      const why=m.reason==='gameFinished'?'本轮已经结束了，谢谢参与'
+        :m.reason==='paused'?'暂停中，稍等片刻'
+        :'这一下没生效，再试一次';
+      if(m.reason==='gameFinished'){S.over=true;render()}else flash(why);
+      return;
+    }
     case S2C.CALLED:return showCalled(m.nickname);
   }
 }
@@ -214,9 +239,17 @@ function render(){
   const st=S.stage;
 
   if(!S.me){
+    if(S.over){
+      view.innerHTML='<div class="mid"><div class="name serif">本轮已结束</div>'+
+        '<div class=rule></div><div class=sub>谢谢参与，看看大屏的前十名吧</div></div>';
+      stopTick();hint.textContent='';return;
+    }
     view.innerHTML='<div class="mid"><div class="name serif">婚礼答题</div>'+
       '<div class=rule></div><div class=sub>点下面的按钮，系统给你取个名字</div>'+
-      '<button class=btn id=go>进　入</button></div>';
+      '<button class=btn id=go>进　入</button>'+
+      // AC-51：这两件事必须在入场页就说，不能等进去之后才告诉人
+      '<div class=sub style="font-size:14px;line-height:1.9">共 13 题，每题 20 秒<br>'+
+      '<b>答得越快，分越高</b><br>中途退出没关系，再扫一次桌上的码就回来，分不会丢</div></div>';
     $('#go').onclick=e=>{e.target.disabled=true;send({type:C2S.JOIN,clientId:cid})};
     stopTick();hint.textContent='不用打字，也不用填手机号';return;
   }
@@ -235,8 +268,12 @@ function render(){
 }
 
 function paintWait(){
+  // AC-07 要的是「明确提示」，不是静默恢复 —— 宾客重开浏览器后最怕的就是分数没了
+  const back=(S.me.total>0||S.me.correctCount>0)
+    ? '<div class=sub>欢迎回来，你的 <b class=num>'+S.me.total+'</b> 分还在</div>' : '';
   view.innerHTML='<div class="mid"><div class="name serif">'+esc(S.me.nickname)+'</div>'+
-    '<div class=rule></div><div class=sub>已经进来 <b class=num>'+S.joined+'</b> 位宾客</div>'+
+    '<div class=rule></div>'+back+
+    '<div class=sub>已经进来 <b class=num>'+S.joined+'</b> 位宾客</div>'+
     '<div class=sub>等主持人开始</div></div>';
   stopTick();
   hint.textContent='答得越快，分越高';
@@ -256,7 +293,9 @@ function paintAsk(){
       if(S.paused)return;
       const i=+b.dataset.i;
       S.pending=i;
-      // 乐观高亮但不盖章 —— 盖章要等服务端回执
+      // 立刻给视觉反馈，但不盖章 —— 盖章代表「服务端已收到」，要等回执（X-2）。
+      // 没有这一步的话，弱网下宾客会以为没点上而反复点，每点一次都刷新计分时刻、白掉分。
+      view.querySelectorAll('.opt').forEach(x=>x.classList.toggle('picking',+x.dataset.i===i));
       send({type:C2S.ANSWER,qIndex:q.qIndex,optionIndex:i});
       paintHint();
     };
@@ -277,7 +316,11 @@ function paintResult(){
   const my=S.my,rv=S.reveal;
   const voided=rv?.voided;
   const ok=my?.outcome===OUTCOME.CORRECT;
-  const word=voided?'本题作废':ok?'答对了':my?.outcome===OUTCOME.TIMEOUT?'没赶上':'答错了';
+  // outcome 为 null 表示这题压根没有你的记录（崩溃恢复、或你在结算态才入场）。
+  // 这不是「你没赶上」—— AC-09 明令禁止把这种情况判成超时甩在宾客脸上。
+  const word=voided?'本题作废'
+    :my?.outcome==null?'这题不计分'
+    :ok?'答对了':my.outcome===OUTCOME.TIMEOUT?'没赶上':'答错了';
   view.innerHTML='<div class="mid">'+
     '<div class="verdict '+(ok?'ok':'no')+'">'+word+'</div>'+
     (voided?'':'<div class="gain num">'+(my?.gained>0?'+'+my.gained:'0')+'</div>')+

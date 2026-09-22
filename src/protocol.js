@@ -45,7 +45,14 @@ export const C2S = Object.freeze({
   HOST_EXPORT: 'host:export',
 });
 
-/** 需要 expectedQIndex 去重的主持人动作 */
+/**
+ * 需要 expectedQIndex 去重的主持人动作。
+ *
+ * 注意：去重只对**会改变题号**的动作真正生效（next / back）。
+ * extend / republish / showQr 这类不改题号的动作，双击仍会执行两次
+ * —— 双击「延长 10 秒」就是 +20 秒。这是已知的，主持人手册里说明即可，
+ * 不值得为此引入操作序号。
+ */
 export const HOST_ACTIONS_NEEDING_QINDEX = Object.freeze([
   C2S.HOST_NEXT,
   C2S.HOST_EXTEND,
@@ -81,6 +88,8 @@ export const S2C = Object.freeze({
   SHOW_QR: 'qr',
   /** 发奖点名：只发给被叫到的那一位 */
   CALLED: 'called',
+  /** 导出的 CSV 内容，由主持人端触发下载 */
+  CSV: 'csv',
   REJECTED: 'rejected',
   PONG: 'pong',
 });

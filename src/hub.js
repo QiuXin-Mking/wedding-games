@@ -233,6 +233,15 @@ export class Hub {
   /** 全局结算 + 逐人的个人结果。个人成绩不进广播，不泄露给全场 */
   pushReveal() {
     this.broadcast(this.game.revealPayload());
+    // 崩溃恢复后第一次结算，必须给宾客一句解释。
+    // 否则他刚才还在答题，一重连就看到结算画面，只会以为是自己的问题。
+    if (this.recovered?.interrupted && !this.recoveredNoticed) {
+      this.recoveredNoticed = true;
+      this.broadcast({
+        type: S2C.NOTICE, kind: NOTICE.RECOVERED,
+        text: '刚才服务出了点小问题，这题不计分，大家的分数都还在',
+      });
+    }
     for (const [ws, meta] of this.conns) {
       if (meta.role !== ROLE.GUEST || !meta.clientId) continue;
       this.#raw(ws, JSON.stringify(this.game.myResultPayload(meta.clientId)));

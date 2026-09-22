@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, readFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { EventLog, replayInto } from '../src/eventlog.js';
+import { EventLog, replayInto, RESUME_WINDOW_MS } from '../src/eventlog.js';
 import { Game, EV } from '../src/game.js';
 import { QuizBank } from '../src/quizbank.js';
 import { NicknamePool } from '../src/nicknames.js';
@@ -84,21 +84,60 @@ describe('追加写', () => {
     });
   });
 
-  test('openLatest 接着上次的 seq 继续写', () => {
+  test('openResumable 接着上次的 seq 继续写', () => {
     withDir((dir) => {
       const a = EventLog.create(dir);
       a.append([{ type: 'x' }, { type: 'y' }]);
       a.close();
-      const b = EventLog.openLatest(dir);
-      assert.equal(b.seq, 2);
-      const [ev] = b.append([{ type: 'z' }]);
+      const found = EventLog.openResumable(dir);
+      assert.equal(found.stale, false);
+      assert.equal(found.log.seq, 2);
+      const [ev] = found.log.append([{ type: 'z' }]);
       assert.equal(ev.seq, 3);
-      b.close();
+      found.log.close();
     });
   });
 
-  test('目录为空时 openLatest 返回 null', () => {
-    withDir((dir) => assert.equal(EventLog.openLatest(dir), null));
+  test('目录为空时 openResumable 返回 null', () => {
+    withDir((dir) => assert.equal(EventLog.openResumable(dir), null));
+  });
+});
+
+describe('H1 彩排日志不得污染当天（只续用还热着的日志）', () => {
+  test('几天前的日志被判为 stale，不续用', () => {
+    withDir((dir) => {
+      const log = EventLog.create(dir);
+      log.append([{ type: 'boot' }, { type: 'game_finish' }]);
+      log.close();
+      // 假装现在是 5 天之后 —— 彩排 9/28，婚礼 10/6
+      const found = EventLog.openResumable(dir, { now: Date.now() + 5 * 86400000 });
+      assert.equal(found.stale, true, '五天前的彩排日志绝不能被当成本场继续');
+      assert.equal(found.log, null, 'stale 时不得返回可写句柄');
+      assert.ok(found.ageMs > RESUME_WINDOW_MS);
+    });
+  });
+
+  test('刚刚的日志仍然续用 —— 崩溃两秒后被拉起不能丢掉这一场', () => {
+    withDir((dir) => {
+      const log = EventLog.create(dir);
+      log.append([{ type: 'boot' }, { type: 'guest_join', clientId: 'a', nickname: 'n', cursor: 0 }]);
+      log.close();
+      const found = EventLog.openResumable(dir);
+      assert.equal(found.stale, false);
+      assert.ok(found.log, '崩溃恢复必须能接上');
+      found.log.close();
+    });
+  });
+
+  test('跨零点重启仍在窗口内', () => {
+    withDir((dir) => {
+      const log = EventLog.create(dir);
+      log.append([{ type: 'boot' }]);
+      log.close();
+      const found = EventLog.openResumable(dir, { now: Date.now() + 2 * 60 * 1000 });
+      assert.equal(found.stale, false, '两分钟前的日志必须续用');
+      found.log.close();
+    });
   });
 });
 

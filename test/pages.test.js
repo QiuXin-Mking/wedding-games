@@ -8,16 +8,22 @@ const read = (n) => readFileSync(new URL(`../public/${n}.html`, import.meta.url)
 
 describe('三端页面', () => {
   for (const name of PAGES) {
-    test(`${name}.html 的模块脚本语法正确`, () => {
+    test(`${name}.html 每一段脚本语法都正确`, () => {
       const src = read(name);
-      const m = src.match(/<script type=module>([\s\S]*?)<\/script>/);
-      assert.ok(m, '必须有一段 module 脚本');
-      // 页面里大量用 JS 字符串拼 HTML，内联属性里的引号极易把外层字符串截断。
-      // 这种错误整个模块都不会执行，页面一片空白，而服务端测试完全发现不了。
-      assert.doesNotThrow(
-        () => new Function(m[1].replace(/^import .*$/gm, '')),
-        `${name}.html 模块脚本语法错误 —— 页面会整个不渲染`,
-      );
+      // 必须覆盖**所有** <script>，不能只查 type=module。
+      // 真实事故：index.html 的 boot 兜底脚本（普通 script）里写了
+      // b.innerHTML='<div style="font:19px/1.6 'Songti SC',serif">'，
+      // 单引号把 JS 字符串提前闭合 → 整块 SyntaxError → 进度函数 p 从未定义 →
+      // 手机永远停在「正在进入」。当时 142 个测试全绿，因为只查了 module 块。
+      const blocks = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)];
+      // 宾客端有 boot 兜底 + 主模块两段；大屏与主持人端只有主模块一段
+      assert.ok(blocks.length >= (name === 'index' ? 2 : 1), '脚本块数量不对');
+      blocks.forEach(([, body], i) => {
+        assert.doesNotThrow(
+          () => new Function(body.replace(/^import .*$/gm, '')),
+          `${name}.html 第 ${i + 1} 段脚本语法错误 —— 这一整块都不会执行`,
+        );
+      });
     });
 
     test(`${name}.html 不引任何外部资源`, () => {

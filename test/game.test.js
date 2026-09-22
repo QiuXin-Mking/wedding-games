@@ -69,9 +69,23 @@ describe('AC-45 延长 10 秒后提交一律 0 分', () => {
     // c1 在延长后第 1 秒提交 —— 比 c0 晚了整整 3 秒
     const late = g.answer('c1', 0, CORRECT, T0 + 21_000);
     assert.equal(late.gained, 0, '延长后提交必须 0 分，否则晚答者反而得分更高');
-    assert.equal(late.outcome, OUTCOME.CORRECT, '对错要如实记录，只是不给分');
+    assert.equal(late.outcome, OUTCOME.TIMEOUT,
+      '延长期内提交记 timeout：延长只给看清题的机会、不补分，就不该算作一次有效作答');
 
     assert.ok(g.tally('c0').total > g.tally('c1').total, '早答者总分必须更高');
+  });
+
+  test('延长期内答对不得污染唱分与排行榜', () => {
+    const { g } = started(2);
+    g.answer('c0', 0, CORRECT, T0 + 1000);
+    g.hostAction(C2S.HOST_EXTEND, { expectedQIndex: 0 }, T0 + 19_000);
+    g.answer('c1', 0, CORRECT, T0 + 21_000);   // 延长期内答对
+
+    assert.equal(g.correctCount(), 1,
+      '主持人唱的「本题答对 N 人」不能把 0 分的人算进去');
+    const t = g.tally('c1');
+    assert.equal(t.correctCount, 0, '终局不能出现「答对 1 题、总分 0」这种自相矛盾');
+    assert.equal(t.elapsedSum, 0, '不得把 >20 秒的耗时灌进排行榜第二排序键');
   });
 
   test('延长只推后结算时机，不改计分基准', () => {
