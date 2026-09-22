@@ -38,6 +38,10 @@ export const C2S = Object.freeze({
   HOST_SHOW_QR: 'host:showQr',
   /** 按需拉宾客列表。不塞进 hostState —— 400 人 × 每次作答会推出几 MB 无谓流量 */
   HOST_GUESTS: 'host:guests',
+  /** 发奖时点名：让该宾客的手机全屏亮起「叫的就是您」。
+      随机昵称切断了名字与真人的联系，光靠主持人念、宾客举手认领并不可靠 ——
+      嘈杂环境里听错、或者不敢举手怕认错，都会让发奖环节冷场。 */
+  HOST_CALL: 'host:call',
   HOST_EXPORT: 'host:export',
 });
 
@@ -75,6 +79,8 @@ export const S2C = Object.freeze({
   GUEST_LIST: 'guestList',
   /** 让大屏重新打出入口二维码，给迟到的人扫 */
   SHOW_QR: 'qr',
+  /** 发奖点名：只发给被叫到的那一位 */
+  CALLED: 'called',
   REJECTED: 'rejected',
   PONG: 'pong',
 });

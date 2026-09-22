@@ -224,6 +224,9 @@ function renderGuests(){
   const rows=guests.filter(g=>!kw||g.nickname.includes(kw)).slice(0,8);
   $('#list').innerHTML=rows.map(g=>'<div class=who><u>'+esc(g.nickname)+'</u>'+
     '<span class=num>'+g.total+'</span>'+
+    // 发奖点名：让这位宾客的手机全屏亮起「叫的就是您」。
+    // 随机昵称和真人之间没有联系，光靠念名字 + 举手认领并不可靠。
+    '<button data-c="'+esc(g.clientId)+'">点名</button>'+
     '<button data-n="'+esc(g.clientId)+'">换名字</button>'+
     '<button class=danger data-r="'+esc(g.clientId)+'">移除</button></div>').join('')||
     (kw?'<div class=who><u>没找到</u></div>':'');
@@ -246,6 +249,8 @@ document.addEventListener('click',e=>{
     if(send({type:a,expectedQIndex:H.qIndex}))toast('已发送：'+b.textContent.replace(/（.*/,''));
     return;
   }
+  const c=e.target.closest('button[data-c]');
+  if(c){send({type:C2S.HOST_CALL,clientId:c.dataset.c,expectedQIndex:H.qIndex});toast('已点名，对方手机会亮起');return}
   const n=e.target.closest('button[data-n]');
   if(n){send({type:C2S.HOST_NEXT_NICKNAME,clientId:n.dataset.n,expectedQIndex:H.qIndex});toast('已重新发放昵称');return}
   const r=e.target.closest('button[data-r]');

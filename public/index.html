@@ -75,13 +75,25 @@ main{flex:1;padding:20px 16px 8px;display:flex;flex-direction:column;justify-con
 .top10 div.mine{background:rgba(200,54,47,.08);font-weight:600}
 .top10 s{flex:none;width:1.6em;color:var(--ink3);text-decoration:none;font-variant-numeric:tabular-nums}
 .top10 u{flex:1;min-width:0;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+/* ── 发奖点名：被叫到的人全屏亮起 ────────────────────────
+   随机昵称切断了名字与真人的联系。演练里三个角色都撞上同一件事：
+   主持人念名字没人应、宾客把「开心的柯基」听成「幸运的锦鲤」、
+   长辈「不敢举手，怕举错了丢人」。这一层就是让当事人确信「叫的是我」。
+   注意不以 opacity:0 起步 —— 内容的可见性不能取决于动画跑起来。 */
+#called{position:fixed;inset:0;z-index:9;display:none;place-content:center;justify-items:center;gap:18px;padding:24px;background:var(--seal);color:#fff;text-align:center}
+#called.on{display:grid}
+#called b{font:600 34px/1.3 "Songti SC","Noto Serif CJK SC",serif}
+#called i{font-style:normal;font-size:19px;opacity:.92}
+#called em{font-style:normal;font:600 22px/1.4 inherit;padding:10px 22px;border:2px solid rgba(255,255,255,.7);border-radius:10px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation:none!important}}
 </style><script>p(45)</script><div id=app>
 <div id=top><div id=me>&nbsp;</div><div id=tick class=idle></div></div>
 <div id=prog><i style="transform:scaleX(0)"></i></div>
 <div id=notice hidden></div>
 <main id=view></main>
 <div id=hint></div>
+<div id=called><i>主持人叫的是</i><b id=calledName></b><em>就是您，请举手</em></div>
 </div><script>p(70)</script>
 <script type=module>
 import {C2S,S2C,STAGE,OUTCOME} from '/src/protocol.js';
@@ -180,7 +192,16 @@ function handle(m){
     case S2C.PAUSED:S.paused=true;return render();
     case S2C.RESUMED:S.paused=false;deadline=Date.now()+offset+(m.remainMs||0);return render();
     case S2C.NOTICE:return flash(m.text);
+    case S2C.CALLED:return showCalled(m.nickname);
   }
+}
+let calledT=0;
+function showCalled(name){
+  $('#calledName').textContent=name;
+  $('#called').classList.add('on');
+  // 震动是额外的保险：嘈杂环境里宾客可能正低头说话没看屏幕
+  try{navigator.vibrate?.([200,100,200])}catch{}
+  clearTimeout(calledT);calledT=setTimeout(()=>$('#called').classList.remove('on'),20000);
 }
 let noticeT=0;
 function flash(t){notice.textContent=t;notice.hidden=false;clearTimeout(noticeT);noticeT=setTimeout(()=>{notice.hidden=true},7000)}

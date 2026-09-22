@@ -153,6 +153,12 @@ export class Hub {
       this.broadcast({ type: S2C.SHOW_QR, on: true }, (m) => m.role === ROLE.SCREEN);
       return { ok: true, events: [] };
     }
+    if (type === C2S.HOST_CALL) {
+      const g = this.game.guests.get(payload.clientId);
+      if (!g) return { ok: false, reason: REJECT.UNKNOWN_GUEST, events: [] };
+      this.sendToGuest(payload.clientId, { type: S2C.CALLED, nickname: g.nickname });
+      return { ok: true, events: [], called: g.nickname };
+    }
     if (type === C2S.HOST_GUESTS) {
       this.send(ws, {
         type: S2C.GUEST_LIST,

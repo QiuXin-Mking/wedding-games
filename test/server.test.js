@@ -344,3 +344,37 @@ describe('snapshot 的形状必须恒定', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('发奖点名（Q-N1 / 演练 X-3）', () => {
+  test('只有被叫到的那位收到 called，其他人收不到', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'srv5-'));
+    const app5 = createApp({ dataDir: dir, hostKey: HOST_KEY, tickMs: 30 });
+    const p5 = await app5.listen(0);
+    const mk = async (role, key, clientId) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${p5}`);
+      const q = [];
+      ws.on('message', (r) => q.push(JSON.parse(r.toString())));
+      await new Promise((r) => ws.on('open', r));
+      ws.send(JSON.stringify({ type: C2S.HELLO, role, key, clientId }));
+      return { ws, q };
+    };
+    const h = await mk(ROLE.HOST, HOST_KEY);
+    const a = await mk(ROLE.GUEST, undefined, 'win');
+    const b = await mk(ROLE.GUEST, undefined, 'other');
+    a.ws.send(JSON.stringify({ type: C2S.JOIN, clientId: 'win' }));
+    b.ws.send(JSON.stringify({ type: C2S.JOIN, clientId: 'other' }));
+    await new Promise((r) => setTimeout(r, 100));
+
+    h.ws.send(JSON.stringify({ type: C2S.HOST_CALL, clientId: 'win' }));
+    await new Promise((r) => setTimeout(r, 120));
+
+    const called = a.q.filter((m) => m.type === S2C.CALLED);
+    assert.equal(called.length, 1, '被叫到的人必须收到');
+    assert.ok(called[0].nickname, '要带上昵称，好让当事人确认没认错');
+    assert.equal(b.q.some((m) => m.type === S2C.CALLED), false, '没被叫到的人不该亮起');
+
+    h.ws.close(); a.ws.close(); b.ws.close();
+    await app5.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
