@@ -254,18 +254,18 @@ function render(){
 
   if(!S.me){
     if(S.over){
-      view.innerHTML='<div class="mid"><div class="name serif">本轮已结束</div>'+
+    view.innerHTML='<div class="mid"><div class="name serif">本轮已结束</div>'+
         '<div class=rule></div><div class=sub>谢谢参与，看看大屏的前十名吧</div></div>';
       stopTick();hint.textContent='';return;
     }
-    view.innerHTML='<div class="mid"><div class="name serif">婚礼答题</div>'+
+    view.innerHTML='<div class="mid"><div class="name serif">婚礼答题现在开始</div>'+
       '<div class=rule></div><div class=sub>点下面的按钮，系统给你取个名字</div>'+
       '<button class=btn id=go>进　入</button>'+
       // AC-51：这两件事必须在入场页就说，不能等进去之后才告诉人
       '<div class=sub style="font-size:14px;line-height:1.9">共 13 题，每题 20 秒<br>'+
       '<b>答得越快，分越高</b><br>中途退出没关系，再扫一次桌上的码就回来，分不会丢</div></div>';
     $('#go').onclick=e=>{e.target.disabled=true;send({type:C2S.JOIN,clientId:cid});armJoinTimeout()};
-    stopTick();hint.textContent='不用打字，也不用填手机号';return;
+    stopTick();hint.textContent='不用打字或填手机号，点选项就能答题';return;
   }
   if(st==='REVEALING'){
     view.innerHTML='<div class="mid"><div class=sub>你的名字是</div>'+
@@ -273,7 +273,7 @@ function render(){
       '<div class=sub>记住它，等下大屏上就认这个名字</div>'+
       '<button class=btn id=ok>好　的</button></div>';
     $('#ok').onclick=()=>{S.stage=S.pendingStage??STAGE.READY;render()};
-    stopTick();hint.textContent='中途退出没关系，再扫一次桌上的码就回来，分不会丢';return;
+    stopTick();hint.textContent='离开后再扫一次桌上的二维码，分数会保留';return;
   }
   if(st===STAGE.ASKING||st===STAGE.PAUSED)return paintAsk();
   if(st===STAGE.REVEAL)return paintResult();
@@ -290,7 +290,7 @@ function paintWait(){
     '<div class=sub>已经进来 <b class=num>'+S.joined+'</b> 位宾客</div>'+
     '<div class=sub>等主持人开始</div></div>';
   stopTick();
-  hint.textContent='答得越快，分越高';
+  hint.textContent='答对且提交得快，得分更高';
 }
 
 function paintAsk(){
