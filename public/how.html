@@ -74,6 +74,25 @@ h1{font:600 clamp(28px,7.4vw,38px)/1.35 "Songti SC","Noto Serif CJK SC",serif;ma
 .three b{display:block;margin-bottom:2px}
 .three span{color:var(--ink2);font-size:14.5px}
 
+/* ── 现场执行的三个链接 ─────────────────── */
+.links{margin:30px 0 0;background:var(--card);border:1px solid var(--line2);border-radius:14px;padding:6px 16px 10px}
+.links .hd{font:500 11px/1 system-ui;color:var(--gold2);letter-spacing:.2em;text-align:center;padding:14px 0 4px}
+.links .hs{text-align:center;color:var(--ink3);font-size:13.5px;margin:4px 0 4px}
+.lk{border-top:1px solid var(--line);padding:15px 0 12px}
+.lk:first-of-type{border-top:0}
+.lk h4{margin:0;font:600 16.5px/1.5 system-ui;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lk h4 small{font:500 11.5px/1 system-ui;color:var(--gold2);letter-spacing:.08em}
+.lk p{margin:4px 0 0;color:var(--ink2);font-size:14px;line-height:1.75}
+.lk .row{display:flex;gap:8px;align-items:center;margin-top:9px}
+.lk .url{flex:1;min-width:0;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);
+         background:var(--paper);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;
+         overflow-wrap:anywhere;text-decoration:none}
+.lk button{flex:none;font:600 13px/1 system-ui;color:#fff;background:var(--seal);border:0;border-radius:8px;
+           padding:10px 13px;cursor:pointer}
+.lk button.ok{background:var(--gold2)}
+.lk .qrimg{display:flex;gap:12px;align-items:center;margin-top:10px;font-size:12.5px;color:var(--ink3)}
+.lk .qrimg img{width:96px;height:96px;border:1px solid var(--line2);border-radius:6px;background:#fff;image-rendering:pixelated}
+
 /* ── 通用段落标题 ───────────────────────── */
 h2{font:600 clamp(21px,5.4vw,25px)/1.4 "Songti SC","Noto Serif CJK SC",serif;
    margin:52px 0 6px;text-align:center}
@@ -101,6 +120,33 @@ footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
      扫一下桌上的二维码就进来了，答得又快又对的人上大屏。</p>
   <div class=seal>喜</div>
 </header>
+
+<section class=links id=links>
+  <div class=hd>现 场 执 行 看 这 里</div>
+  <p class=hs>婚礼当天要用的三个页面都在这儿，点开即用，都不需要口令</p>
+
+  <div class=lk>
+    <h4>主持人手册 <small>发给司仪</small></h4>
+    <p>司仪开场前读一遍：怎么开场、每道题按哪个键、出意外时说什么，都写好了。</p>
+    <div class=row><a class=url href="/guide">/guide</a><button type=button>复制</button></div>
+  </div>
+
+  <div class=lk>
+    <h4>大屏 <small>投到宴会厅屏幕上</small></h4>
+    <p>在接大屏的电脑上用浏览器打开，点页面上的「全屏」。开场前半小时打开挂着就行；
+       万一黑屏，刷新一下会自动回到当前这道题，刷新后记得再点一次「全屏」。</p>
+    <div class=row><a class=url href="/screen">/screen</a><button type=button>复制</button></div>
+  </div>
+
+  <div class=lk>
+    <h4>宾客页面 <small>桌卡二维码就是它</small></h4>
+    <p>不用单独发给宾客，大家扫桌上的二维码进来的就是这一页。
+       布置前可以自己扫一下试试。打印桌卡用下面这张二维码。</p>
+    <div class=row><a class=url href="/">/</a><button type=button>复制</button></div>
+    <div class=qrimg><img src="/qr.png" alt="宾客入场二维码" width=96 height=96>
+      <span>桌卡用的入场二维码<br>手机长按图片可保存，电脑上右键另存为</span></div>
+  </div>
+</section>
 
 <h2>先认识三块屏幕</h2>
 <p class=sub>整件事就是这三块屏幕在配合，看懂它们就看懂了全部</p>
@@ -291,4 +337,24 @@ footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
 </footer>
 
 </div>
+<script>
+// 链接写的是相对路径，换服务器地址也不用改页面；显示时补成完整地址，方便服务商转发
+document.querySelectorAll('.lk .url').forEach(function(a){ a.textContent=a.href; });
+// 线上是 http，拿不到 navigator.clipboard，只能用选中文本 + execCommand 兜底
+document.querySelectorAll('.lk button').forEach(function(b){
+  b.onclick=function(){
+    var t=document.createElement('textarea');
+    t.value=b.previousElementSibling.href;
+    t.setAttribute('readonly','');
+    t.style.cssText='position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(t);
+    t.select(); t.setSelectionRange(0,t.value.length);
+    var ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(t);
+    b.textContent=ok?'已复制':'请长按链接复制';
+    b.className=ok?'ok':'';
+    setTimeout(function(){ b.textContent='复制'; b.className=''; },2000);
+  };
+});
+</script>
 </html>

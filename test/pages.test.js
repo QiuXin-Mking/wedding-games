@@ -17,7 +17,7 @@ describe('三端页面', () => {
       // 手机永远停在「正在进入」。当时 142 个测试全绿，因为只查了 module 块。
       const blocks = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)];
       // 宾客端有 boot 兜底 + 主模块两段；大屏与主持人端只有主模块一段
-      // 宾客端必须有 boot 兜底 + 主模块两段；纯静态页（如 how）一段脚本都没有，也合法
+      // 宾客端必须有 boot 兜底 + 主模块两段；其余页面脚本段数不限
       if (name === 'index') assert.ok(blocks.length >= 2, 'index.html 缺 boot 兜底或主模块');
       blocks.forEach(([, body], i) => {
         assert.doesNotThrow(
