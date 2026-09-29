@@ -5,7 +5,7 @@ p=function(n){var b=document.getElementById('bar');if(b)b.style.transform='scale
 setTimeout(function(){
   var b=document.getElementById('boot');
   if(b)b.innerHTML='<div style="font:19px/1.6 \'Songti SC\',serif">网络有点慢，还没连上</div>'+
-    '<div style="font-size:15px;opacity:.8">可以再扫一次桌上的二维码</div>'+
+    '<div style="font-size:15px;opacity:.8">可以再扫一次大屏上的二维码</div>'+
     '<button onclick="location.reload()" style="min-height:48px;padding:0 28px;border:0;border-radius:10px;background:#C8362F;color:#fff;font:600 16px/1 inherit">重　试</button>';
 },12000);
 </script><style>
@@ -263,7 +263,7 @@ function render(){
       '<button class=btn id=go>进　入</button>'+
       // AC-51：这两件事必须在入场页就说，不能等进去之后才告诉人
       '<div class=sub style="font-size:14px;line-height:1.9">共 13 题，每题 20 秒<br>'+
-      '<b>答得越快，分越高</b><br>中途退出没关系，再扫一次桌上的码就回来，分不会丢</div></div>';
+      '<b>答得越快，分越高</b><br>中途退出没关系，再扫一次大屏上的码就回来，分不会丢</div></div>';
     $('#go').onclick=e=>{e.target.disabled=true;send({type:C2S.JOIN,clientId:cid});armJoinTimeout()};
     stopTick();hint.textContent='不用打字或填手机号，点选项就能答题';return;
   }
@@ -273,7 +273,7 @@ function render(){
       '<div class=sub>记住它，等下大屏上就认这个名字</div>'+
       '<button class=btn id=ok>好　的</button></div>';
     $('#ok').onclick=()=>{S.stage=S.pendingStage??STAGE.READY;render()};
-    stopTick();hint.textContent='离开后再扫一次桌上的二维码，分数会保留';return;
+    stopTick();hint.textContent='离开后再扫一次大屏上的二维码，分数会保留';return;
   }
   if(st===STAGE.ASKING||st===STAGE.PAUSED)return paintAsk();
   if(st===STAGE.REVEAL)return paintResult();
