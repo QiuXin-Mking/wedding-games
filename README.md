@@ -21,7 +21,7 @@
 > 口令只存在于服务器的 systemd 配置里，用这条命令查：
 >
 > ```bash
-> ssh root@119.29.186.63 "grep -E 'SCREEN_KEY|HOST_KEY' /etc/systemd/system/wedding-quiz.service"
+> ssh root@119.29.186.63 "grep -E 'HOST_KEY|ADMIN_KEY' /etc/systemd/system/wedding-quiz.service"
 > ```
 >
 > 换口令：改上面那个文件里的两行，然后
@@ -47,10 +47,10 @@
 ```bash
 npm install          # 只会装一个包：ws
 npm start            # 默认 8888 端口，无构建步骤
-npm test             # 150 个用例
+npm test             # 164 个用例
 ```
 
-打开 <http://localhost:8888/>。大屏和主持人端的默认口令是 `screen` / `host`。
+打开 <http://localhost:8888/>。主持人端和后台的默认口令是 `host` / `admin`（大屏不需要口令）。
 
 常用脚本：
 
@@ -65,19 +65,26 @@ npm run loadtest -- --clients 400 --url ws://<地址>   # 并发压测
 
 ## 双题库切换
 
-两套题库都在仓库里，靠环境变量切，**不改代码、不重新构建**：
+两套题库都在仓库里，**在后台页点一下就切**，不改代码、不重新构建、不用登服务器：
 
 | 题库 | 文件 | 何时用 |
 |------|------|--------|
-| 测试题库 | `questions/test.json` | 开发、联调、彩排（**默认**） |
+| 测试题库 | `questions/test.json` | 开发、联调、彩排 |
 | 婚礼题库 | `questions/wedding.json` | 正式场 |
 
-```bash
-# 切到正式题库
-ssh root@119.29.186.63
-sed -i 's/QUIZ_BANK=test/QUIZ_BANK=wedding/' /etc/systemd/system/wedding-quiz.service
-systemctl daemon-reload && systemctl restart wedding-quiz
-```
+**怎么切**：打开后台 `http://119.29.186.63:8888/admin?key=<口令>`，
+点「**切换题库**」（按钮下方小字写着当前是哪套、点了切到哪套），确认弹窗后即生效。
+
+> ⚠️ **切题库 = 开新的一场。** 这个按钮会同时清空当前这一局：宾客清零、题号归零、分数清空，
+> 三端自动回到待机页（旧日志归档到 `data/archive/`，不会真的删掉）。
+> 所以**只能在开场前、彩排数据已经不需要之后切**，婚礼进行中绝对不要点。
+
+**选择会被记住**：后台切换时写入服务器的 `data/bank` 文件，服务重启（崩溃自愈、机器重启）后依然生效。
+
+> **`data/bank` 优先于环境变量。** 服务启动时先读 `data/bank`，只有该文件不存在
+> （或内容不是 `test` / `wedding`）时才看 systemd 里的 `QUIZ_BANK`（未设置则用测试题库）。
+> 所以环境变量只是首装时的兜底 —— 一旦在后台切过，再改 `QUIZ_BANK` 并重启**不会生效**，
+> 角标照旧。要切就回后台页切。
 
 ### ✅ 切完必须确认
 
@@ -86,8 +93,11 @@ systemctl daemon-reload && systemctl restart wedding-quiz
 - 显示「**正式题库**」→ 切对了
 - 显示「测试题库」→ **没切成功**，全场会答一套通用常识题
 
-指定 `wedding` 而文件不存在时，**服务端会直接启动失败并报错，绝不会静默回退到测试题库** ——
-婚礼当天用错题库是不可接受的事故，这是唯一的防呆。
+`wedding.json` 不存在或格式不对时，**绝不会静默回退到测试题库** ——
+婚礼当天用错题库是不可接受的事故，这是唯一的防呆：
+
+- 在后台点切换：切不过去，后台页提示原因，**旧题库继续在用**
+- 服务启动时（`data/bank` 或 `QUIZ_BANK` 指定了 `wedding`）：**服务端直接启动失败并报错**
 
 题库格式见 `questions/test.json`。正题必须恰好 13 道，备用题至少 1 道
 （备用题供 `host:back` 换题用，不参与正常出题顺序）。

@@ -2,7 +2,8 @@
  * 题库加载与校验（docs/01 §4.1）。
  *
  * 双题库：questions/test.json（默认）与 questions/wedding.json（真实婚礼题），
- * 由环境变量 QUIZ_BANK=test|wedding 切换，不改代码、不重新构建。
+ * 由后台页切换（持久化到 data/bank），该文件不存在时才看环境变量 QUIZ_BANK=test|wedding。
+ * 不改代码、不重新构建。
  *
  * **指定 wedding 而文件缺失时必须启动失败，绝不静默回退到测试题库** ——
  * 婚礼当天用错题库是不可接受的事故，这是唯一的防呆。
