@@ -58,6 +58,7 @@ npm test             # 164 个用例
 npm run check:nicknames          # 校验昵称池（U1~U5）
 npm run qr -- http://<地址>/     # 重新生成入口二维码
 npm run names                    # 打印昵称池，供人工过目
+npm run cards                    # 生成主持人纸质题卡（A4 HTML，含答案，写到 wip/）
 npm run loadtest -- --clients 400 --url ws://<地址>   # 并发压测
 ```
 
