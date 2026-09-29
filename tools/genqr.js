@@ -55,4 +55,4 @@ for (const [ext, type, extra] of [['png', 'png', ['-w', '480']], ['svg', 'svg', 
 
 console.log(`\n内容：${url}`);
 console.log('⚠️  请用独立解码器验证它能扫出上面这个地址，不要只看图像像不像二维码。');
-console.log('    打印成桌卡尺寸后，还要再用真手机实扫一次（FR-9.3）。');
+console.log('    投到大屏后，还要从最远的一桌用真手机实扫一次（FR-9.3）。');
