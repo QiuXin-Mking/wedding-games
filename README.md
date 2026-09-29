@@ -47,7 +47,7 @@
 ```bash
 npm install          # 只会装一个包：ws
 npm start            # 默认 8888 端口，无构建步骤
-npm test             # 164 个用例
+npm test             # 165 个用例
 ```
 
 打开 <http://localhost:8888/>。主持人端和后台的默认口令是 `host` / `admin`（大屏不需要口令）。

@@ -555,6 +555,42 @@ describe('后台运维页', () => {
       '题库选择没持久化 —— 服务一重启就会悄悄退回测试题库，而那一刻没人在看大屏角标');
     b.ws.close(); await app2.close();
   });
+
+  test('换题库失败时当前这一局原封不动，之后的作答照常落盘', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'admin4-'));
+    const app = createApp({ dataDir: dir, screenKey: SCREEN_KEY, hostKey: HOST_KEY, adminKey: 'adm', tickMs: 30 });
+    const port = await app.listen(0);
+
+    const g = await mk(port);
+    g.send({ type: C2S.HELLO, role: ROLE.GUEST });
+    await g.wait((m) => m.type === S2C.SNAPSHOT);
+    g.send({ type: C2S.JOIN, clientId: 'g1' });
+    await g.wait((m) => m.type === S2C.IDENTITY);
+    const logs = readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
+
+    // 非法题库名和 wedding.json 缺失走的是同一条路：loadBank 抛错
+    const a = await mk(port);
+    a.send({ type: C2S.HELLO, role: ROLE.ADMIN, key: 'adm' });
+    await a.wait((m) => m.type === S2C.ADMIN_STATE);
+    a.q.length = 0;
+    a.send({ type: C2S.ADMIN_RESET, bank: 'production' });
+    const s = await a.wait((m) => m.type === S2C.ADMIN_STATE);
+    assert.ok(s.error, '换库失败要把原因告诉后台');
+    assert.equal(s.bank, 'test', '旧题库继续用');
+    assert.equal(s.joined, 1, '换库失败不能顺手把这一局清掉');
+    assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith('.jsonl')), logs, '日志不能被归档走');
+
+    // 日志必须还开着：新宾客入场要能写进同一份日志
+    const g2 = await mk(port);
+    g2.send({ type: C2S.HELLO, role: ROLE.GUEST });
+    await g2.wait((m) => m.type === S2C.SNAPSHOT);
+    g2.send({ type: C2S.JOIN, clientId: 'g2' });
+    await g2.wait((m) => m.type === S2C.IDENTITY);
+    const text = readFileSync(join(dir, logs[0]), 'utf8');
+    assert.ok(text.includes('"g2"'), '换库失败后日志写不进去了 —— 服务一重启这之后的成绩就全丢');
+
+    g.ws.close(); g2.ws.close(); a.ws.close(); await app.close();
+  });
 });
 
 

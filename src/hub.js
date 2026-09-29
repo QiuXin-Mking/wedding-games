@@ -61,6 +61,10 @@ export class Hub {
   resetAll({ bankName } = {}) {
     if (!this.dataDir) throw new Error('未提供 dataDir，无法重置');
 
+    // 先把新题库加载好再动当前这一局：校验不过就在这里抛，日志和对局原封不动，
+    // 后台提示的「旧题库仍在使用」才是真的。先关日志再抛，之后的作答就全写不进去了
+    const nextBank = bankName && bankName !== this.bank.name ? loadBank({ bank: bankName }) : null;
+
     this.log.close();
     try {
       const dir = join(this.dataDir, 'archive');
@@ -74,8 +78,8 @@ export class Hub {
       }
     } catch { /* 归档失败不该挡住重开，日志还在原处 */ }
 
-    if (bankName && bankName !== this.bank.name) {
-      this.bank = loadBank({ bank: bankName });   // 校验不过会抛，旧库继续用
+    if (nextBank) {
+      this.bank = nextBank;
       saveBankChoice(this.dataDir, bankName);
     }
 
