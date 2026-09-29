@@ -115,6 +115,9 @@ async function main() {
     const nOpt = qs[0].options.length;
     const picked = guests.map((_, i) => i % nOpt);
     const ackWait = guests.map((g) => waitFor(g, S2C.ANSWER_ACK));
+    // 结算结果必须在提交前就开始等：全员答完服务端会自动结算，走公网时
+    // 部分人的 myResult 会先于最后一条回执到达，晚注册就漏接，被误判成错分
+    const settled = guests.map((g) => waitFor(g, S2C.MY_RESULT));
     const submitAt = Date.now();
     guests.forEach((g, i) => g.send({ type: C2S.ANSWER, qIndex: q, optionIndex: picked[i] }));
     const acks = await Promise.all(ackWait.map((p) => p.catch(() => null)));
@@ -122,7 +125,7 @@ async function main() {
     lostAcks += acks.filter((a) => !a || !a.accepted).length;
 
     // ── 阶段四：等结算，用不变量核对 ─────────────────────
-    const settled = guests.map((g) => waitFor(g, S2C.MY_RESULT));
+    // 没凑齐全员作答时（场上还有别的宾客）靠提前结算收尾；已自动结算过的题会被服务端拒掉，不改状态
     host.send({ type: C2S.HOST_EARLY_SETTLE, expectedQIndex: q });
     const results = await Promise.all(settled.map((p) => p.catch(() => null)));
 
